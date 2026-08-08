@@ -4,28 +4,29 @@
 #          advanced rebounding into the two "comprehensive"
 #          analysis-ready tables that are the actual point of a
 #          pipeline run:
-#            data_processed/team_game_features.rds   (1 row/team-game)
-#            data_processed/player_game_features.rds (1 row/player-game)
-#          Also updates state/manifest.json.
+#            data_processed/team_game_features.parquet   (1 row/team-game)
+#            data_processed/player_game_features.parquet (1 row/player-game)
+#          Also updates state/manifest.json. These two are single
+#          files, fully rewritten each run - cheap at this data's
+#          size, unlike the raw season-partitioned datasets.
 # ============================================================
 
 build_team_game_features <- function(cfg, logger) {
-  team_logs_path    <- file.path(cfg$path_data_raw, "team_game_logs.rds")
-  rest_travel_path  <- file.path(cfg$path_data_processed, "schedule_team_level_final.rds")
-  reb_path          <- file.path(cfg$path_data_processed, "team_rebounding_features.rds")
+  team_logs <- read_full_dataset(cfg$path_team_logs_dataset)
 
-  if (!file.exists(team_logs_path)) {
-    logger$log("team_game_features: SKIPPED, no team_game_logs.rds yet.")
+  if (is.null(team_logs)) {
+    logger$log("team_game_features: SKIPPED, no team game logs yet.")
     return(invisible(NULL))
   }
 
-  team_logs <- readRDS(team_logs_path) %>%
+  team_logs <- team_logs %>%
     dplyr::mutate(team_id = as.character(team_id), game_id_nba = as.character(game_id_nba))
 
   out <- compute_team_rolling_features(team_logs, windows = cfg$rolling_windows)
 
-  if (file.exists(rest_travel_path)) {
-    rest_travel <- readRDS(rest_travel_path) %>%
+  rest_travel <- read_parquet_or_null(cfg$path_schedule_team_level)
+  if (!is.null(rest_travel)) {
+    rest_travel <- rest_travel %>%
       dplyr::mutate(team_id = as.character(team_id), game_id_nba = as.character(game_id_nba)) %>%
       dplyr::select(
         team_id, game_id_nba, opponent_id, home_away,
@@ -37,8 +38,9 @@ build_team_game_features <- function(cfg, logger) {
     logger$log("team_game_features: rest/travel table not found yet, joining without it.")
   }
 
-  if (file.exists(reb_path)) {
-    reb <- readRDS(reb_path) %>%
+  reb <- read_parquet_or_null(cfg$path_rebounding_features)
+  if (!is.null(reb)) {
+    reb <- reb %>%
       dplyr::mutate(team_id = as.character(team_id), game_id_nba = as.character(game_id_nba)) %>%
       dplyr::rename_with(~ paste0("adv_", .x), -c(team_id, game_id_nba))
     out <- out %>% dplyr::left_join(reb, by = c("team_id", "game_id_nba"))
@@ -46,21 +48,20 @@ build_team_game_features <- function(cfg, logger) {
     logger$log("team_game_features: advanced rebounding table not found yet, joining without it.")
   }
 
-  saveRDS(out, file.path(cfg$path_data_processed, "team_game_features.rds"))
-  logger$log("  team_game_features.rds written (", nrow(out), " rows, ", ncol(out), " cols)")
+  write_parquet(out, cfg$path_team_game_features)
+  logger$log("  ", cfg$path_team_game_features, " written (", nrow(out), " rows, ", ncol(out), " cols)")
   out
 }
 
 build_player_game_features <- function(cfg, logger) {
-  player_logs_path   <- file.path(cfg$path_data_raw, "player_game_logs.rds")
-  team_features_path <- file.path(cfg$path_data_processed, "team_game_features.rds")
+  player_logs <- read_full_dataset(cfg$path_player_logs_dataset)
 
-  if (!file.exists(player_logs_path)) {
-    logger$log("player_game_features: SKIPPED, no player_game_logs.rds yet.")
+  if (is.null(player_logs)) {
+    logger$log("player_game_features: SKIPPED, no player game logs yet.")
     return(invisible(NULL))
   }
 
-  player_logs <- readRDS(player_logs_path) %>%
+  player_logs <- player_logs %>%
     dplyr::mutate(
       team_id     = as.character(team_id),
       game_id_nba = as.character(game_id_nba),
@@ -69,8 +70,9 @@ build_player_game_features <- function(cfg, logger) {
 
   out <- compute_player_rolling_features(player_logs, windows = cfg$rolling_windows)
 
-  if (file.exists(team_features_path)) {
-    team_context <- readRDS(team_features_path) %>%
+  team_context <- read_parquet_or_null(cfg$path_team_game_features)
+  if (!is.null(team_context)) {
+    team_context <- team_context %>%
       dplyr::mutate(team_id = as.character(team_id), game_id_nba = as.character(game_id_nba)) %>%
       dplyr::select(
         team_id, game_id_nba, home_away,
@@ -82,8 +84,8 @@ build_player_game_features <- function(cfg, logger) {
     logger$log("player_game_features: team rest/travel context not found yet, joining without it.")
   }
 
-  saveRDS(out, file.path(cfg$path_data_processed, "player_game_features.rds"))
-  logger$log("  player_game_features.rds written (", nrow(out), " rows, ", ncol(out), " cols)")
+  write_parquet(out, cfg$path_player_game_features)
+  logger$log("  ", cfg$path_player_game_features, " written (", nrow(out), " rows, ", ncol(out), " cols)")
   out
 }
 
@@ -102,9 +104,8 @@ combine_all_features <- function(cfg, logger) {
     manifest$last_game_date_pulled <- as.character(max(team_feat$game_date, na.rm = TRUE))
   }
 
-  schedule_path <- file.path(cfg$path_data_raw, "schedule.rds")
-  if (file.exists(schedule_path)) {
-    loaded_seasons <- unique(readRDS(schedule_path)$season)
+  loaded_seasons <- dataset_seasons_present(cfg$path_schedule_dataset)
+  if (length(loaded_seasons) > 0) {
     # Everything except the current (always-refreshed) season counts as
     # durably "fully loaded" for reporting purposes.
     manifest$seasons_fully_loaded <- setdiff(loaded_seasons, current_season())

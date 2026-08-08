@@ -41,50 +41,51 @@ pull_league_game_log <- function(season, player_or_team) {
 }
 
 # ------------------------------------------------------------
-# Shared driver for both stages below - only the output path,
+# Shared driver for both stages below - only the dataset path,
 # the API's player_or_team flag, and the dedupe key differ.
+#
+# Season-partitioned, same pattern as R/pull_schedule.R: each
+# season to pull is deduped against just its own existing
+# partition and written back to just that partition.
 # ------------------------------------------------------------
-refresh_game_log <- function(cfg, logger, label, filename, player_or_team, dedupe_cols) {
-  path <- file.path(cfg$path_data_raw, filename)
-  existing <- read_existing_rds(path, required_cols = c("season", "game_id_nba"))
-
+refresh_game_log <- function(cfg, logger, label, path, player_or_team, dedupe_cols) {
   all_seasons      <- season_sequence(cfg$first_season)
-  existing_seasons <- if (is.null(existing)) character(0) else unique(existing$season)
+  existing_seasons <- dataset_seasons_present(path)
   seasons_to_pull  <- compute_seasons_to_pull(all_seasons, existing_seasons, refresh_current = TRUE)
 
   if (length(seasons_to_pull) == 0) {
     logger$log(label, ": nothing to pull, all seasons up to date.")
-    return(existing)
+    return(invisible(NULL))
   }
 
   logger$log(label, ": pulling ", length(seasons_to_pull), " season(s) via bulk league game log: ",
              paste(seasons_to_pull, collapse = ", "))
 
-  new_logs <- purrr::map_dfr(seasons_to_pull, function(s) {
+  for (s in seasons_to_pull) {
     logger$log("  pulling ", s, "...")
-    out <- try(pull_league_game_log(s, player_or_team), silent = TRUE)
+    new_rows <- try(pull_league_game_log(s, player_or_team), silent = TRUE)
     Sys.sleep(cfg$throttle_team_logs_sec)
-    if (inherits(out, "try-error")) {
-      logger$log("    FAILED: ", conditionMessage(attr(out, "condition")))
-      return(NULL)
+    if (inherits(new_rows, "try-error")) {
+      logger$log("    FAILED: ", conditionMessage(attr(new_rows, "condition")))
+      next
     }
-    out
-  })
 
-  n_before <- if (is.null(existing)) 0L else nrow(existing)
-  combined <- combine_and_dedupe(existing, new_logs, dedupe_cols = dedupe_cols)
-  n_added  <- nrow(combined) - n_before
+    existing <- read_season_partition(path, s, required_cols = c("season", "game_id_nba"))
+    combined <- combine_and_dedupe(existing, new_rows, dedupe_cols = dedupe_cols)
+    write_season_partition(combined, path)
 
-  saveRDS(combined, path)
-  logger$log("  ", filename, " written (", nrow(combined), " total rows, ", n_added, " new)")
-  combined
+    n_new <- nrow(combined) - (if (is.null(existing)) 0L else nrow(existing))
+    logger$log("    season ", s, ": ", nrow(combined), " rows (", n_new, " new)")
+  }
+
+  invisible(NULL)
 }
 
 refresh_team_game_logs <- function(cfg, logger) {
   refresh_game_log(
     cfg, logger,
     label           = "Team game logs",
-    filename        = "team_game_logs.rds",
+    path            = cfg$path_team_logs_dataset,
     player_or_team  = "T",
     dedupe_cols     = c("team_id", "game_id_nba")
   )
@@ -94,7 +95,7 @@ refresh_player_game_logs <- function(cfg, logger) {
   refresh_game_log(
     cfg, logger,
     label           = "Player game logs",
-    filename        = "player_game_logs.rds",
+    path            = cfg$path_player_logs_dataset,
     player_or_team  = "P",
     dedupe_cols     = c("player_id", "game_id_nba")
   )

@@ -37,8 +37,8 @@ refresh_reference_data <- function(cfg, logger) {
     logger$log("  FAILED to pull players: ", conditionMessage(attr(players, "condition")))
     players <- NULL
   } else {
-    saveRDS(players, file.path(cfg$path_data_raw, "players_raw.rds"))
-    logger$log("  players_raw.rds written (", nrow(players), " rows)")
+    write_parquet(players, cfg$path_players_raw)
+    logger$log("  ", cfg$path_players_raw, " written (", nrow(players), " rows)")
   }
 
   teams <- try(pull_teams_raw(), silent = TRUE)
@@ -46,8 +46,8 @@ refresh_reference_data <- function(cfg, logger) {
     logger$log("  FAILED to pull teams: ", conditionMessage(attr(teams, "condition")))
     teams <- NULL
   } else {
-    saveRDS(teams, file.path(cfg$path_data_raw, "teams_raw.rds"))
-    logger$log("  teams_raw.rds written (", nrow(teams), " rows)")
+    write_parquet(teams, cfg$path_teams_raw)
+    logger$log("  ", cfg$path_teams_raw, " written (", nrow(teams), " rows)")
   }
 
   invisible(list(players = players, teams = teams))

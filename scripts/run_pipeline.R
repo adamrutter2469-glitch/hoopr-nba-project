@@ -25,6 +25,7 @@ suppressMessages({
   library(jsonlite)
   library(slider)
   library(tibble)
+  library(arrow)
 })
 
 source("config/config.R")

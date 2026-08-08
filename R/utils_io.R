@@ -42,6 +42,76 @@ combine_and_dedupe <- function(existing_logs, new_logs, dedupe_cols = NULL) {
 }
 
 # ------------------------------------------------------------
+# Parquet storage helpers.
+#
+# Single-file tables (reference data, feature tables - small,
+# cheaply rewritten whole every run) just use arrow::read_parquet/
+# write_parquet directly via these thin wrappers.
+#
+# Season-partitioned datasets (schedule, team/player game logs -
+# unbounded history) are Hive-style directories written via
+# arrow::write_dataset(): <path>/season=2022-23/part-0.parquet.
+# existing_data_behavior = "delete_matching" means writing one
+# season's data only touches that season's partition - every other
+# season's file is left untouched on disk, so a routine run's cost
+# (and the data it rewrites) stays proportional to what changed,
+# not to how much history has piled up.
+# ------------------------------------------------------------
+read_parquet_or_null <- function(path, required_cols = NULL) {
+  if (!file.exists(path)) return(NULL)
+  df <- arrow::read_parquet(path)
+  if (!validate_existing_table(df, required_cols)) return(NULL)
+  df
+}
+
+write_parquet <- function(df, path) {
+  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+  arrow::write_parquet(df, path)
+}
+
+# Which season= partitions currently exist in a dataset directory.
+dataset_seasons_present <- function(path) {
+  if (!dir.exists(path)) return(character(0))
+  parts <- list.dirs(path, full.names = FALSE, recursive = FALSE)
+  sub("^season=", "", parts[grepl("^season=", parts)])
+}
+
+# Read just one season's partition (NULL if that partition doesn't
+# exist yet or fails validation) - this is what makes per-season
+# incremental dedupe possible without ever loading full history.
+read_season_partition <- function(path, season, required_cols = NULL) {
+  if (!(season %in% dataset_seasons_present(path))) return(NULL)
+  df <- arrow::open_dataset(path) %>%
+    dplyr::filter(season == .env$season) %>%
+    dplyr::collect()
+  if (!validate_existing_table(df, required_cols)) return(NULL)
+  df
+}
+
+# Write a data frame into a season-partitioned dataset. Only the
+# season(s) present in `df` are touched; every other partition
+# already on disk is left alone.
+write_season_partition <- function(df, path) {
+  dir.create(path, showWarnings = FALSE, recursive = TRUE)
+  arrow::write_dataset(
+    df, path,
+    format = "parquet",
+    partitioning = "season",
+    existing_data_behavior = "delete_matching"
+  )
+}
+
+# Read the full dataset across all seasons (NULL if none exist yet).
+# Still cheap at this data's size - only the raw pull/write side
+# needs the per-season scoping above.
+read_full_dataset <- function(path) {
+  if (!dir.exists(path) || length(dataset_seasons_present(path)) == 0) return(NULL)
+  df <- arrow::open_dataset(path) %>% dplyr::collect()
+  if (nrow(df) == 0) return(NULL)
+  df
+}
+
+# ------------------------------------------------------------
 # Manifest: the pipeline's memory of what it already pulled.
 # Stored as human-readable JSON in state/manifest.json so it can
 # be eyeballed or hand-edited (e.g. to force a re-pull window).

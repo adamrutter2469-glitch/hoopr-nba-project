@@ -89,17 +89,19 @@ refresh_rebounding_features <- function(cfg, logger) {
     return(invisible(NULL))
   }
 
-  team_logs_path <- file.path(cfg$path_data_raw, "team_game_logs.rds")
-  if (!file.exists(team_logs_path)) {
-    logger$log("Advanced rebounding: SKIPPED, no team_game_logs.rds yet - run the game log stage first.")
+  team_logs <- read_full_dataset(cfg$path_team_logs_dataset)
+  if (is.null(team_logs)) {
+    logger$log("Advanced rebounding: SKIPPED, no team game logs yet - run that stage first.")
     return(invisible(NULL))
   }
 
-  needed <- readRDS(team_logs_path) %>%
+  needed <- team_logs %>%
     dplyr::distinct(team_id, game_id_nba) %>%
     dplyr::mutate(team_id = as.character(team_id), game_id_nba = as.character(game_id_nba))
 
-  raw_path <- file.path(cfg$path_data_raw, "team_rebounding_dashboards.rds")
+  # Nested API responses (multiple sub-tables per team-game) don't fit
+  # parquet's flat/columnar model, so this one cache stays RDS.
+  raw_path <- cfg$path_rebounding_raw_cache
   existing_raw <- read_existing_rds(raw_path, required_cols = c("team_id", "game_id_nba"))
 
   already_have <- if (is.null(existing_raw)) {
@@ -160,7 +162,7 @@ refresh_rebounding_features <- function(cfg, logger) {
     function(tid, gid, dash) get_team_reb_metrics(tid, gid, dash = dash)
   )
 
-  saveRDS(parsed, file.path(cfg$path_data_processed, "team_rebounding_features.rds"))
-  logger$log("  team_rebounding_features.rds written (", nrow(parsed), " rows)")
+  write_parquet(parsed, cfg$path_rebounding_features)
+  logger$log("  ", cfg$path_rebounding_features, " written (", nrow(parsed), " rows)")
   parsed
 }

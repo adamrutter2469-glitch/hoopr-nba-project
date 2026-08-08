@@ -8,7 +8,7 @@
 
 required_packages <- c(
   "dplyr", "janitor", "hoopR", "purrr", "tidyr", "readr",
-  "jsonlite", "slider", "tibble", "stringr"
+  "jsonlite", "slider", "tibble", "stringr", "arrow"
 )
 
 installed <- rownames(installed.packages())

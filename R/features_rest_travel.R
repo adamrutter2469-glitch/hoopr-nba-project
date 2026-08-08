@@ -173,9 +173,9 @@ expand_game_table_per_team <- function(schedule_df) {
 # travel_detail.rds -> schedule_team_level_final.rds
 # ------------------------------------------------------------
 refresh_rest_travel_features <- function(cfg, logger) {
-  schedule_path <- file.path(cfg$path_data_raw, "schedule.rds")
-  if (!file.exists(schedule_path)) {
-    logger$log("Rest/travel features: SKIPPED, no schedule.rds found yet.")
+  schedule <- read_full_dataset(cfg$path_schedule_dataset)
+  if (is.null(schedule)) {
+    logger$log("Rest/travel features: SKIPPED, no schedule data found yet.")
     return(invisible(NULL))
   }
   if (!file.exists(cfg$path_travel_csv)) {
@@ -185,7 +185,7 @@ refresh_rest_travel_features <- function(cfg, logger) {
 
   logger$log("Rest/travel features: recomputing from full schedule...")
 
-  schedule <- readRDS(schedule_path) %>%
+  schedule <- schedule %>%
     dplyr::mutate(game_id = game_id_nba, game_date = as.Date(game_date)) %>%
     dplyr::select(season, game_date, game_id_nba, game_id, dplyr::everything())
 
@@ -193,12 +193,12 @@ refresh_rest_travel_features <- function(cfg, logger) {
     janitor::clean_names()
 
   with_travel <- build_game_level_table(schedule_df = schedule, travel_df = travel_df)
-  saveRDS(with_travel, file.path(cfg$path_data_processed, "schedule_with_travel_detail.rds"))
-  logger$log("  schedule_with_travel_detail.rds written (", nrow(with_travel), " rows)")
+  write_parquet(with_travel, cfg$path_schedule_with_travel)
+  logger$log("  ", cfg$path_schedule_with_travel, " written (", nrow(with_travel), " rows)")
 
   team_level <- expand_game_table_per_team(with_travel)
-  saveRDS(team_level, file.path(cfg$path_data_processed, "schedule_team_level_final.rds"))
-  logger$log("  schedule_team_level_final.rds written (", nrow(team_level), " rows)")
+  write_parquet(team_level, cfg$path_schedule_team_level)
+  logger$log("  ", cfg$path_schedule_team_level, " written (", nrow(team_level), " rows)")
 
   team_level
 }

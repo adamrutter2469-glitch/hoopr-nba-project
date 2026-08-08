@@ -36,40 +36,42 @@ pull_nba_schedule <- function(season) {
 # ------------------------------------------------------------
 # Orchestration entry point. cfg$first_season (config/config.R)
 # controls how far back a first-ever run will backfill.
+#
+# Season-partitioned: each season to pull is deduped and written
+# to its own partition, leaving every other season's file on disk
+# untouched (see write_season_partition() in R/utils_io.R).
 # ------------------------------------------------------------
 refresh_schedule <- function(cfg, logger) {
-  path <- file.path(cfg$path_data_raw, "schedule.rds")
-  existing <- read_existing_rds(path, required_cols = c("season", "game_id_nba"))
+  path <- cfg$path_schedule_dataset
 
-  all_seasons     <- season_sequence(cfg$first_season)
-  existing_seasons <- if (is.null(existing)) character(0) else unique(existing$season)
+  all_seasons      <- season_sequence(cfg$first_season)
+  existing_seasons <- dataset_seasons_present(path)
   seasons_to_pull  <- compute_seasons_to_pull(all_seasons, existing_seasons, refresh_current = TRUE)
 
   if (length(seasons_to_pull) == 0) {
     logger$log("Schedule: nothing to pull, all seasons up to date.")
-    return(existing)
+    return(invisible(NULL))
   }
 
   logger$log("Schedule: pulling ", length(seasons_to_pull), " season(s): ",
              paste(seasons_to_pull, collapse = ", "))
 
-  new_schedule <- purrr::map_dfr(seasons_to_pull, function(s) {
+  for (s in seasons_to_pull) {
     logger$log("  pulling schedule for ", s, "...")
-    out <- try(pull_nba_schedule(s), silent = TRUE)
-    if (inherits(out, "try-error")) {
-      logger$log("    FAILED: ", conditionMessage(attr(out, "condition")))
-      return(NULL)
+    new_rows <- try(pull_nba_schedule(s), silent = TRUE)
+    if (inherits(new_rows, "try-error")) {
+      logger$log("    FAILED: ", conditionMessage(attr(new_rows, "condition")))
+      next
     }
-    out
-  })
 
-  combined <- combine_and_dedupe(existing, new_schedule, dedupe_cols = "game_id_nba") %>%
-    dplyr::mutate(
-      game_date = as.Date(game_date),
-      season    = as.character(season)
-    )
+    existing <- read_season_partition(path, s, required_cols = c("season", "game_id_nba"))
+    combined <- combine_and_dedupe(existing, new_rows, dedupe_cols = "game_id_nba") %>%
+      dplyr::mutate(game_date = as.Date(game_date), season = as.character(season))
 
-  saveRDS(combined, path)
-  logger$log("  schedule.rds written (", nrow(combined), " total rows)")
-  combined
+    write_season_partition(combined, path)
+    n_new <- nrow(combined) - (if (is.null(existing)) 0L else nrow(existing))
+    logger$log("    season ", s, ": ", nrow(combined), " rows (", n_new, " new)")
+  }
+
+  invisible(NULL)
 }
