@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(R --version)",
-      "Bash(Rscript --version)"
-    ]
-  }
-}
