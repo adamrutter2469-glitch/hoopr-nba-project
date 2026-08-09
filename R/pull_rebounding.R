@@ -112,6 +112,13 @@ refresh_rebounding_features <- function(cfg, logger) {
 
   pending <- dplyr::anti_join(needed, already_have, by = c("team_id", "game_id_nba"))
 
+  # Declared here (not just inside the else-branch below) so they're
+  # always defined for this stage's return value, whether or not
+  # there was anything pending this run - the run summary reports
+  # these regardless.
+  success_count <- 0L
+  fail_count <- 0L
+
   if (nrow(pending) == 0) {
     logger$log("Advanced rebounding: nothing new to pull (", nrow(already_have), " team-games already cached).")
   } else {
@@ -120,8 +127,6 @@ refresh_rebounding_features <- function(cfg, logger) {
                "(>= ", est_min, " min at current throttle, likely more with real API latency)...")
 
     buffer <- vector("list", nrow(pending))
-    success_count <- 0L
-    fail_count <- 0L
 
     for (i in seq_len(nrow(pending))) {
       tid <- pending$team_id[i]
@@ -154,7 +159,7 @@ refresh_rebounding_features <- function(cfg, logger) {
 
   if (is.null(existing_raw) || nrow(existing_raw) == 0) {
     logger$log("Advanced rebounding: no cached dashboards to parse yet.")
-    return(invisible(NULL))
+    return(list(pulled = success_count, failed = fail_count, data = NULL))
   }
 
   parsed <- purrr::pmap_dfr(
@@ -164,5 +169,5 @@ refresh_rebounding_features <- function(cfg, logger) {
 
   write_parquet(parsed, cfg$path_rebounding_features)
   logger$log("  ", cfg$path_rebounding_features, " written (", nrow(parsed), " rows)")
-  parsed
+  list(pulled = success_count, failed = fail_count, data = parsed)
 }

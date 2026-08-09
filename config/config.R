@@ -127,5 +127,11 @@ cfg <- list(
   # r2_warn_storage_gb logs a warning before that point so you see it
   # coming.
   r2_warn_storage_gb = 5,
-  r2_max_storage_gb  = 9
+  r2_max_storage_gb  = 9,
+
+  # R2's actual free-tier quota, used only for the end-of-run summary's
+  # "X GB / 10 GB (Y% utilized)" line (R/run_summary.R) - kept separate
+  # from r2_max_storage_gb so the abort trigger and the reported quota
+  # can't drift apart by accident if one is ever tuned independently.
+  r2_free_tier_gb = 10
 )

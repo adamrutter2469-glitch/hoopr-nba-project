@@ -49,9 +49,15 @@ if ("--skip-r2-sync" %in% args) {
 logger <- init_logger(cfg$path_logs)
 on.exit(logger$close(), add = TRUE)
 
+# Snapshot BEFORE any stage runs, so the end-of-run summary can report
+# what changed relative to where things stood at the start.
+manifest_before <- read_manifest(cfg$path_manifest)
+
 logger$log("=== NBA Pipeline run starting ===")
 start_time <- Sys.time()
 failures <- 0L
+stage_failures <- list()   # stage name -> error message, for the summary
+stage_results  <- list()   # holds the two rebounding stages' return values
 
 run_stage <- function(name, expr) {
   logger$log("--- ", name, " ---")
@@ -60,6 +66,7 @@ run_stage <- function(name, expr) {
     error = function(e) {
       logger$log("  STAGE FAILED: ", conditionMessage(e))
       failures <<- failures + 1L
+      stage_failures[[name]] <<- conditionMessage(e)
       NULL
     }
   )
@@ -70,12 +77,14 @@ run_stage("Schedule",             refresh_schedule(cfg, logger))
 run_stage("Team game logs",       refresh_team_game_logs(cfg, logger))
 run_stage("Player game logs",     refresh_player_game_logs(cfg, logger))
 run_stage("Rest/travel features", refresh_rest_travel_features(cfg, logger))
-run_stage("Advanced rebounding",  refresh_rebounding_features(cfg, logger))
-run_stage("Player rebounding",    refresh_player_rebounding_features(cfg, logger))
+stage_results$team_rebounding   <- run_stage("Advanced rebounding",  refresh_rebounding_features(cfg, logger))
+stage_results$player_rebounding <- run_stage("Player rebounding",    refresh_player_rebounding_features(cfg, logger))
 run_stage("Combine features",     combine_all_features(cfg, logger))
 run_stage("R2 sync",              sync_to_r2(cfg, logger))
 
 elapsed <- round(as.numeric(difftime(Sys.time(), start_time, units = "mins")), 1)
+
+print_run_summary(cfg, logger, manifest_before, stage_failures, stage_results, elapsed)
 
 if (failures > 0) {
   logger$log("=== Pipeline finished with ", failures, " stage failure(s) in ", elapsed, " min ===")

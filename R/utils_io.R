@@ -152,7 +152,8 @@ write_manifest <- function(manifest, path) {
 # a record even when nobody's watching the console.
 # Usage:
 #   logger <- init_logger("logs")
-#   logger$log("Step 1: ...")
+#   logger$log("Step 1: ...")     # timestamped, for the stage-by-stage trace
+#   logger$raw("plain line")      # untimestamped, for a scannable summary block
 #   ...
 #   logger$close()
 # ------------------------------------------------------------
@@ -168,8 +169,14 @@ init_logger <- function(log_dir = "logs") {
     writeLines(txt, con)
   }
 
+  raw_fn <- function(txt = "") {
+    message(txt)
+    writeLines(txt, con)
+  }
+
   list(
     log   = log_fn,
+    raw   = raw_fn,
     path  = log_path,
     close = function() close(con)
   )
