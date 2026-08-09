@@ -8,7 +8,8 @@
 
 required_packages <- c(
   "dplyr", "janitor", "hoopR", "purrr", "tidyr", "readr",
-  "jsonlite", "slider", "tibble", "stringr", "arrow"
+  "jsonlite", "slider", "tibble", "stringr", "arrow",
+  "glmnet", "xgboost"  # models/train_rebounds_model.R
 )
 
 installed <- rownames(installed.packages())
