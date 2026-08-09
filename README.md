@@ -79,6 +79,9 @@ models/
                            wired into run_pipeline.bat. Trained model files are git-ignored.
 python/                    read-only exploration from PyCharm/Python - see python/README.md
 docs/data_dictionary/      one CSV per table describing every column - see its own README.md
+streamlit_app/             UI, reading straight from R2 (not local files) - see its own README.md.
+                           Currently just a connection smoke test (displays the 30 teams); the
+                           real dashboard comes once the analysis layer exists.
 notes/                     unchanged from before the redesign
 ```
 
