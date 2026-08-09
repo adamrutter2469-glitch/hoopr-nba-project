@@ -14,8 +14,25 @@ run_pipeline.bat                        # pulls anything new and rebuilds the fe
 ```
 
 `run_pipeline.bat` is safe to run as often as you like (daily, after every night's games, etc.) -
-everything is incremental. Pass `--skip-rebounding` and/or `--skip-player-rebounding` to skip
-either slow advanced-rebounding stage for a single run: `run_pipeline.bat --skip-rebounding`.
+everything is incremental. Pass `--skip-rebounding`, `--skip-player-rebounding`, and/or
+`--skip-r2-sync` to skip any of the slower/optional stages for a single run:
+`run_pipeline.bat --skip-rebounding`.
+
+### Cloud backup (Cloudflare R2)
+
+Every run ends by mirroring `data_raw/` and `data_processed/` to a private R2 bucket
+(`R/sync_r2.R`, via [rclone](https://rclone.org/)) - mainly so the rebounding pulls (hours of
+throttled API calls) never have to be re-run from scratch just because the local copy was lost.
+Requires `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` in `.env`
+(see `.env.example`) - the stage silently skips itself if any are missing, so it's opt-in.
+
+**Safety cap**: before any upload, the stage checks the *local* size of `data_raw/` +
+`data_processed/` against `cfg$r2_max_storage_gb` (default 9, a 1 GB buffer under R2's 10 GB
+free tier) and refuses to sync anything at all if that's met or exceeded - loudly, as a failed
+stage, not a silent skip. `rclone sync` mirrors rather than accumulates, so remote usage tracks
+local usage; the cap exists so a future bug that caused some table to balloon in row count can't
+turn into a surprise storage bill. `cfg$r2_warn_storage_gb` (default 5) logs a warning before
+that point.
 
 ## What you get
 

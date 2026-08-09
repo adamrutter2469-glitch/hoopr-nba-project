@@ -101,5 +101,31 @@ cfg <- list(
   # Rolling average windows (trailing N games), used by
   # R/features_rolling.R for both team and player stats
   # ------------------------------------------------------------
-  rolling_windows = c(5, 10, 20)
+  rolling_windows = c(5, 10, 20),
+
+  # ------------------------------------------------------------
+  # Cloudflare R2 sync (R/sync_r2.R) - mirrors data_raw/ and
+  # data_processed/ to a private R2 bucket after every pipeline run.
+  # Credentials (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+  # R2_BUCKET_NAME) live in .env, never here - see .env.example.
+  # ------------------------------------------------------------
+  r2_sync_enabled = TRUE,
+
+  # Full path to rclone.exe - not on the system PATH on this machine,
+  # so referenced directly rather than assumed to be findable.
+  path_rclone_exe = "C:/Users/12623/bin/rclone.exe",
+
+  # Safety cap: R2's free tier is 10 GB. Before every sync, the
+  # pipeline checks the LOCAL size of data_raw/ + data_processed/
+  # (rclone sync mirrors, so remote usage tracks local size closely)
+  # and refuses to upload anything at all once that meets/exceeds
+  # r2_max_storage_gb, leaving a 1 GB buffer under the real cap. A
+  # run that blows past it fails loudly (counted as a stage failure,
+  # not a silent skip) instead of uploading first and asking
+  # questions later - so a future bug that caused some table to
+  # explode in row count can't turn into a surprise storage bill.
+  # r2_warn_storage_gb logs a warning before that point so you see it
+  # coming.
+  r2_warn_storage_gb = 5,
+  r2_max_storage_gb  = 9
 )

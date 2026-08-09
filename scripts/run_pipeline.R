@@ -12,8 +12,11 @@
 #                               rebounding stage for THIS run only.
 #   --skip-player-rebounding   Same, for the player-level advanced-
 #                               rebounding stage.
-#   Neither changes config/config.R - useful for a fast verification
-#   run or a routine run when you don't want to wait on one of them.
+#   --skip-r2-sync             Skip mirroring data_raw/ and
+#                               data_processed/ to Cloudflare R2.
+#   None of these change config/config.R - useful for a fast
+#   verification run or a routine run when you don't want to wait on
+#   one of them.
 # ============================================================
 
 suppressMessages({
@@ -38,6 +41,9 @@ if ("--skip-rebounding" %in% args) {
 }
 if ("--skip-player-rebounding" %in% args) {
   cfg$player_rebounding_enabled <- FALSE
+}
+if ("--skip-r2-sync" %in% args) {
+  cfg$r2_sync_enabled <- FALSE
 }
 
 logger <- init_logger(cfg$path_logs)
@@ -67,6 +73,7 @@ run_stage("Rest/travel features", refresh_rest_travel_features(cfg, logger))
 run_stage("Advanced rebounding",  refresh_rebounding_features(cfg, logger))
 run_stage("Player rebounding",    refresh_player_rebounding_features(cfg, logger))
 run_stage("Combine features",     combine_all_features(cfg, logger))
+run_stage("R2 sync",              sync_to_r2(cfg, logger))
 
 elapsed <- round(as.numeric(difftime(Sys.time(), start_time, units = "mins")), 1)
 
