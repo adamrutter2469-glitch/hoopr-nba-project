@@ -20,12 +20,16 @@ for a single run: `run_pipeline.bat --skip-rebounding`.
 ## What you get
 
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel
-  context, trailing 5/10/20-game rolling averages, and (if enabled) advanced rebounding splits.
+  context, trailing 5/10/20-game rolling averages, opponent/matchup features (what the opponent's
+  own rolling form looks like, what each team typically allows, explicit comparison columns), and
+  (if enabled) advanced rebounding splits. 269 columns - see `python/README.md` for the naming
+  convention (`_rollN` / `opp_*` / `*_allowed` / `*_matchup_edge`).
 - `data_processed/player_game_features.parquet` - one row per player per game: box score, trailing
   rolling averages, and their team's rest/travel context for that game.
 
-Read either with `arrow::read_parquet("data_processed/team_game_features.parquet")` (or
-`arrow::open_dataset()` for the season-partitioned raw tables under `data_raw/` - see below).
+Read either with `arrow::read_parquet("data_processed/team_game_features.parquet")` in R (or
+`arrow::open_dataset()` for the season-partitioned raw tables under `data_raw/` - see below), or
+from Python/PyCharm via `python/` - see `python/README.md`.
 
 ## Layout
 
@@ -47,7 +51,11 @@ data_processed/            joined, feature-engineered parquet output (git-ignore
 state/manifest.json        what's already been pulled (git-ignored, rebuilds automatically)
 logs/                      one timestamped log per run (git-ignored)
 legacy/                    the pre-redesign scripts/functions/data, kept for reference
-notes/, models/            unchanged from before the redesign
+models/
+  train_rebounds_model.R   REB prediction (elastic net + xgboost) - separate, user-run, not
+                           wired into run_pipeline.bat. Trained model files are git-ignored.
+python/                    read-only exploration from PyCharm/Python - see python/README.md
+notes/                     unchanged from before the redesign
 ```
 
 Data under `data_raw/` and `data_processed/` (except `data_raw/external/`), plus `state/`

@@ -21,3 +21,9 @@ state/*.json
 models/*.rds
 models/*.model
 
+# Python (python/) - venv and bytecode cache, not versioned.
+python/.venv/
+python/venv/
+__pycache__/
+*.pyc
+
