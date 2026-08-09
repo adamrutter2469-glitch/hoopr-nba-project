@@ -7,12 +7,13 @@
 #          directly with `Rscript scripts/run_pipeline.R` from the
 #          project root.
 #
-# Optional flag:
-#   --skip-rebounding   Skip the slow advanced-rebounding stage
-#                        for THIS run only (does not change
-#                        config/config.R - useful for a fast
-#                        verification run or a routine run when
-#                        you don't want to wait on it).
+# Optional flags:
+#   --skip-rebounding          Skip the slow team-level advanced-
+#                               rebounding stage for THIS run only.
+#   --skip-player-rebounding   Same, for the player-level advanced-
+#                               rebounding stage.
+#   Neither changes config/config.R - useful for a fast verification
+#   run or a routine run when you don't want to wait on one of them.
 # ============================================================
 
 suppressMessages({
@@ -34,6 +35,9 @@ invisible(purrr::walk(list.files("R", full.names = TRUE, pattern = "\\.R$"), sou
 args <- commandArgs(trailingOnly = TRUE)
 if ("--skip-rebounding" %in% args) {
   cfg$advanced_rebounding_enabled <- FALSE
+}
+if ("--skip-player-rebounding" %in% args) {
+  cfg$player_rebounding_enabled <- FALSE
 }
 
 logger <- init_logger(cfg$path_logs)
@@ -61,6 +65,7 @@ run_stage("Team game logs",       refresh_team_game_logs(cfg, logger))
 run_stage("Player game logs",     refresh_player_game_logs(cfg, logger))
 run_stage("Rest/travel features", refresh_rest_travel_features(cfg, logger))
 run_stage("Advanced rebounding",  refresh_rebounding_features(cfg, logger))
+run_stage("Player rebounding",    refresh_player_rebounding_features(cfg, logger))
 run_stage("Combine features",     combine_all_features(cfg, logger))
 
 elapsed <- round(as.numeric(difftime(Sys.time(), start_time, units = "mins")), 1)

@@ -14,8 +14,8 @@ run_pipeline.bat                        # pulls anything new and rebuilds the fe
 ```
 
 `run_pipeline.bat` is safe to run as often as you like (daily, after every night's games, etc.) -
-everything is incremental. Pass `--skip-rebounding` to skip the slow advanced-rebounding stage
-for a single run: `run_pipeline.bat --skip-rebounding`.
+everything is incremental. Pass `--skip-rebounding` and/or `--skip-player-rebounding` to skip
+either slow advanced-rebounding stage for a single run: `run_pipeline.bat --skip-rebounding`.
 
 ## What you get
 
@@ -50,6 +50,8 @@ data_raw/
   player_game_logs/        season-partitioned parquet dataset
   players_raw.parquet, teams_raw.parquet     single files, fully refreshed each run
   team_rebounding_dashboards.rds             raw nested API cache - stays RDS, see below
+  player_rebounding_dashboards.rds           same, player grain - scoped down by default,
+                                              see cfg$player_rebounding_seasons/_min_minutes
   external/                 static reference data (travel-time CSV) - tracked in git
 data_processed/            joined, feature-engineered parquet output (git-ignored)
 state/manifest.json        what's already been pulled (git-ignored, rebuilds automatically)
@@ -92,9 +94,29 @@ it's the format going forward instead of RDS.
 pulled. Every run: reference data (players/teams) is cheaply refreshed in full; the schedule
 and game logs pull any season not yet loaded plus always re-pull the current season (since it
 keeps changing) - each pulled season is deduped and written to just its own partition; rest/
-travel and rolling-average features are cheap local recomputes; advanced rebounding only pulls
-team-game pairs it doesn't already have, since that's the one stage with no bulk API endpoint
-(see `R/pull_rebounding.R`).
+travel and rolling-average features are cheap local recomputes; advanced rebounding (both
+`R/pull_rebounding.R` at team grain and `R/pull_player_rebounding.R` at player grain) only
+pulls game pairs it doesn't already have, since that's the one stage with no bulk API endpoint.
+
+On any key collision during a re-pull, the freshly-pulled row always wins over whatever was
+cached (see `combine_and_dedupe()` in `R/utils_io.R`) - so a stat correction the API issues
+after the fact, or a game whose final box score wasn't available on an earlier run, gets
+picked up and overwritten rather than getting stuck on a stale value forever.
+
+### Only finalized games are ingested
+
+`data_raw/schedule` carries the NBA Stats API's own game status (`game_status`: 1 = scheduled,
+2 = live, 3 = final; see `is_final` = `game_status == 3`) - and it's the *schedule* table, so it
+deliberately includes every game in a season, played or not, which is what lets you look up
+tonight's games ahead of time (`schedule %>% filter(game_date == today, !is_final)`) even though
+box scores for them don't exist yet.
+
+Box scores are the opposite: `R/pull_game_logs.R` cross-checks every pulled team/player row
+against that season's schedule and drops anything not marked `is_final`, regardless of whether
+the underlying box-score endpoint (`hoopR::nba_leaguegamelog()`) would have included it anyway -
+this makes "only ingest finalized games" true by construction rather than an assumption about
+API behavior. The advanced-rebounding stages only ever pull for `game_id`s already present in
+the (already-filtered) game logs, so they inherit the same guarantee automatically.
 
 See `notes/Ideas` for the open research question this pipeline was built to make easy to
 answer: does team performance dip below its rolling average with less rest or more travel?

@@ -69,7 +69,14 @@ STAT_GLOSSARY <- c(
   adv_reb_0_3 = "rebounds grabbed 0-3 feet from the basket",
   adv_reb_3_6 = "rebounds grabbed 3-6 feet from the basket",
   adv_reb_6_10 = "rebounds grabbed 6-10 feet from the basket",
-  adv_reb_10_plus = "rebounds grabbed 10+ feet from the basket"
+  adv_reb_10_plus = "rebounds grabbed 10+ feet from the basket",
+  # Player-level only (hoopR::nba_playerdashptreb() exposes this split,
+  # nba_teamdashptreb() doesn't): distance of the missed SHOT the
+  # rebound came off of, not the rebound's own distance from the hoop.
+  reb_shot_0_6 = "rebounds off a shot missed 0-6 feet out",
+  reb_shot_7_13 = "rebounds off a shot missed 7-13 feet out",
+  reb_shot_13_19 = "rebounds off a shot missed 13-19 feet out",
+  reb_shot_19_plus = "rebounds off a shot missed 19+ feet out"
 )
 
 # Raw per-game stat columns that reflect THIS game's actual outcome -
@@ -140,6 +147,12 @@ GLOBAL_OVERRIDES <- list(
     sources = "hoopR::nba_leaguegamelog()", family = "metadata", leakage_risk = "safe (metadata only)"),
   fantasy_pts = list(description = "Actual NBA Stats fantasy points scored in this exact game.", logic = NA,
     sources = "hoopR::nba_leaguegamelog()", family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result"),
+  game_status = list(description = "NBA Stats API game status code: 1 = scheduled (not yet started), 2 = live/in progress, 3 = final.", logic = NA,
+    sources = "hoopR::nba_schedule()", family = "metadata", leakage_risk = "safe (metadata only)"),
+  game_status_text = list(description = "Human-readable status - 'Final'/'Final/OT' once done, or the scheduled tip-off time (e.g. '7:00 pm ET') beforehand.", logic = NA,
+    sources = "hoopR::nba_schedule()", family = "metadata", leakage_risk = "safe (metadata only)"),
+  is_final = list(description = "TRUE once this game is officially final. R/pull_game_logs.R cross-checks every pulled box-score row against this before keeping it - the pipeline's guarantee that only finalized games' stats are ingested (in-progress and future scheduled games are excluded from box scores, though scheduled games ARE kept in the schedule table itself for reference).",
+    logic = "game_status == 3", sources = "game_status", family = "context", leakage_risk = "safe"),
   # game-grain (schedule_with_travel_detail) home_*/away_* variants -
   # same concepts as above, one game per row instead of one team-game.
   home_team_id = list(description = "Home team's identifier.", logic = NA, sources = "hoopR::nba_schedule()", family = "identifier", leakage_risk = "safe"),
@@ -197,6 +210,21 @@ TABLE_SPECIFIC_OVERRIDES <- list(
            leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game")
     }),
     sub("^adv_", "", names(STAT_GLOSSARY)[grepl("^adv_", names(STAT_GLOSSARY))])
+  ),
+  # Same idea, player grain: the 12 rebounding stats shared with the
+  # team-level table (bare names, same reasoning as above) plus the 4
+  # player-only shot-distance columns (already bare in STAT_GLOSSARY,
+  # no "adv_" stripping needed).
+  player_rebounding_features = setNames(
+    lapply(c(names(STAT_GLOSSARY)[grepl("^adv_", names(STAT_GLOSSARY))],
+             "reb_shot_0_6", "reb_shot_7_13", "reb_shot_13_19", "reb_shot_19_plus"),
+           function(glossary_key) {
+             list(description = sprintf("Actual %s recorded in this exact game.", STAT_GLOSSARY[[glossary_key]]),
+                  logic = NA_character_, sources = "hoopR::nba_playerdashptreb()", family = "raw_actual",
+                  leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game")
+           }),
+    c(sub("^adv_", "", names(STAT_GLOSSARY)[grepl("^adv_", names(STAT_GLOSSARY))]),
+      "reb_shot_0_6", "reb_shot_7_13", "reb_shot_13_19", "reb_shot_19_plus")
   )
 )
 
@@ -310,6 +338,9 @@ TABLES <- list(
   team_rebounding_features = list(path = cfg$path_rebounding_features, kind = "parquet",
     description = "Parsed advanced (shot-distance / contested) rebounding splits, one row per team per game. This-game actuals only - the rolling averages built from these live in team_game_features with an adv_ prefix.",
     sources = "hoopR::nba_teamdashptreb() via data_raw/team_rebounding_dashboards.rds"),
+  player_rebounding_features = list(path = cfg$path_player_rebounding_features, kind = "parquet",
+    description = "Parsed advanced (shot-distance / contested) rebounding splits, one row per player per game. Player-grain analog of team_rebounding_features, plus a bonus shot-distance-of-miss split not available at the team level. Scoped by cfg$player_rebounding_seasons and cfg$player_rebounding_min_minutes (see config/config.R) - not necessarily every player-game like the other tables.",
+    sources = "hoopR::nba_playerdashptreb() via data_raw/player_rebounding_dashboards.rds"),
   schedule_with_travel_detail = list(path = cfg$path_schedule_with_travel, kind = "parquet",
     description = "One row per game, with home_*/away_* rest and travel columns side by side.",
     sources = "schedule; data_raw/external/nba_airport_flight_matrix.csv"),

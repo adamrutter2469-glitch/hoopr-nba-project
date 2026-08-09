@@ -1,9 +1,12 @@
 row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
 1,schedule,"Regular-season game schedule (preseason excluded), one row per game.",NA,hoopR::nba_schedule(),NA,NA,NA
-2,game_date,Calendar date the game was/will be played.,NA,hoopR API,Date,identifier,safe
-3,game_id_nba,NBA Stats API's canonical game identifier.,NA,hoopR API,character,identifier,safe
-4,home_team_id,Home team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
-5,away_team_id,Away team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
-6,home_team_tricode,Home team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
-7,away_team_tricode,Away team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
-8,season,"Season string, e.g. '2022-23'.","Set explicitly to the season being pulled, not trusted from the API's own inconsistently-typed season field - see R/pull_schedule.R.",NA,character,identifier,safe
+2,is_final,"TRUE once this game is officially final. R/pull_game_logs.R cross-checks every pulled box-score row against this before keeping it - the pipeline's guarantee that only finalized games' stats are ingested (in-progress and future scheduled games are excluded from box scores, though scheduled games ARE kept in the schedule table itself for reference).",game_status == 3,game_status,logical,context,safe
+3,game_date,Calendar date the game was/will be played.,NA,hoopR API,Date,identifier,safe
+4,game_id_nba,NBA Stats API's canonical game identifier.,NA,hoopR API,character,identifier,safe
+5,home_team_id,Home team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
+6,away_team_id,Away team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
+7,home_team_tricode,Home team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
+8,away_team_tricode,Away team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
+9,game_status,"NBA Stats API game status code: 1 = scheduled (not yet started), 2 = live/in progress, 3 = final.",NA,hoopR::nba_schedule(),integer,metadata,safe (metadata only)
+10,game_status_text,"Human-readable status - 'Final'/'Final/OT' once done, or the scheduled tip-off time (e.g. '7:00 pm ET') beforehand.",NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
+11,season,"Season string, e.g. '2022-23'.","Set explicitly to the season being pulled, not trusted from the API's own inconsistently-typed season field - see R/pull_schedule.R.",NA,character,identifier,safe

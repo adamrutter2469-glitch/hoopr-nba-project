@@ -13,8 +13,18 @@
 # Incremental logic is season-level (same proven pattern as the
 # rest of the pipeline): historical seasons, once fully pulled,
 # are never re-pulled; the current season is always re-pulled
-# since new games complete continuously and hoopR::nba_leaguegamelog
-# naturally only returns games that have already happened.
+# since new games complete continuously.
+#
+# Finalized-games-only guarantee: nba_leaguegamelog is understood to
+# be a historical league log (not a live feed), but that's not
+# something this pipeline can fully verify without a game actually in
+# progress to test against. Rather than rely on that assumption,
+# every pulled row is cross-checked against that season's schedule
+# (R/pull_schedule.R, which carries the NBA Stats API's own
+# game_status field) and dropped if the schedule doesn't say Final -
+# see filter_to_final_games() below. This makes "only ingest
+# finalized games" true by construction, independent of whatever the
+# log endpoint itself does or doesn't include.
 # ============================================================
 
 # Box score stat columns that should be numeric. The API returns them as
@@ -38,6 +48,34 @@ pull_league_game_log <- function(season, player_or_team) {
       season    = season,
       game_date = as.Date(game_date)
     )
+}
+
+# ------------------------------------------------------------
+# Drop any pulled row whose game isn't marked Final in that season's
+# schedule - the actual "only finalized games" guarantee. Missing
+# schedule data (cold start, or an older cached season partition from
+# before game_status was captured) fails open rather than dropping
+# everything: better to keep a row we can't verify than to silently
+# discard a whole season's pull because of a schema mismatch.
+# ------------------------------------------------------------
+filter_to_final_games <- function(rows, schedule_season, logger, label) {
+  if (is.null(schedule_season) || !("is_final" %in% names(schedule_season))) {
+    logger$log("    (schedule status unavailable for this season - keeping all pulled ", label, " rows unfiltered)")
+    return(rows)
+  }
+
+  final_game_ids <- schedule_season %>%
+    dplyr::filter(is_final) %>%
+    dplyr::pull(game_id_nba) %>%
+    unique()
+
+  before <- nrow(rows)
+  out <- rows %>% dplyr::filter(game_id_nba %in% final_game_ids)
+  dropped <- before - nrow(out)
+  if (dropped > 0) {
+    logger$log("    dropped ", dropped, " ", label, " row(s) for games not marked Final (in progress, scheduled, or postponed)")
+  }
+  out
 }
 
 # ------------------------------------------------------------
@@ -69,6 +107,9 @@ refresh_game_log <- function(cfg, logger, label, path, player_or_team, dedupe_co
       logger$log("    FAILED: ", conditionMessage(attr(new_rows, "condition")))
       next
     }
+
+    schedule_season <- read_season_partition(cfg$path_schedule_dataset, s, required_cols = c("game_id_nba"))
+    new_rows <- filter_to_final_games(new_rows, schedule_season, logger, label)
 
     existing <- read_season_partition(path, s, required_cols = c("season", "game_id_nba"))
     combined <- combine_and_dedupe(existing, new_rows, dedupe_cols = dedupe_cols)

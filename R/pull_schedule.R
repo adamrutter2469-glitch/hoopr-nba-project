@@ -23,14 +23,26 @@ pull_nba_schedule <- function(season) {
       home_team_id,
       away_team_id,
       home_team_tricode,
-      away_team_tricode
+      away_team_tricode,
+      game_status,
+      game_status_text
     ) %>%
     dplyr::rename(game_id_nba = game_id) %>%
-    # Use the requested season string, not the API's own "season" field -
-    # that field's type/format is inconsistent across calls (observed a
-    # live integer-vs-character clash across seasons), which broke
-    # bind_rows() when combining multiple seasons' pulls.
-    dplyr::mutate(season = season, .before = 1)
+    dplyr::mutate(
+      # game_status: 1 = scheduled (not yet started), 2 = live/in
+      # progress, 3 = final. This is what lets R/pull_game_logs.R
+      # cross-check that a game is actually done before treating its
+      # stats as real, and what lets you query "tonight's games"
+      # (game_status == 1, game_date == today) for reference before
+      # they've been played.
+      is_final = game_status == 3,
+      # Use the requested season string, not the API's own "season" field -
+      # that field's type/format is inconsistent across calls (observed a
+      # live integer-vs-character clash across seasons), which broke
+      # bind_rows() when combining multiple seasons' pulls.
+      season = season,
+      .before = 1
+    )
 }
 
 # ------------------------------------------------------------

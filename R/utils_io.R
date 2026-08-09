@@ -30,10 +30,20 @@ read_existing_rds <- function(path, required_cols = NULL) {
 # Combine existing + newly-pulled rows and drop duplicates.
 # dedupe_cols = NULL dedupes on the full row (old default
 # behavior); pass key columns (e.g. "game_id_nba") to dedupe on
-# identity instead, keeping the first occurrence of each key.
+# identity instead.
+#
+# new_logs is bound FIRST, so on a key collision the freshly-pulled
+# row wins over whatever was already on disk (dplyr::distinct() keeps
+# the first occurrence per key). This matters: every "current season"
+# re-pull re-fetches games we already have on purpose, and a fresh
+# pull should always be able to correct/refresh a row - e.g. a game
+# that was captured before the schedule marked it Final, or any stat
+# correction the API issues after the fact. Getting this backwards
+# (old row wins) would let a stale row get stuck forever, since
+# nothing ever re-derives it.
 # ------------------------------------------------------------
 combine_and_dedupe <- function(existing_logs, new_logs, dedupe_cols = NULL) {
-  combined <- dplyr::bind_rows(existing_logs, new_logs)
+  combined <- dplyr::bind_rows(new_logs, existing_logs)
   if (is.null(dedupe_cols)) {
     dplyr::distinct(combined)
   } else {

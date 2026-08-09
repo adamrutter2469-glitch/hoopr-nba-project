@@ -48,6 +48,9 @@ cfg <- list(
   path_rebounding_raw_cache = "data_raw/team_rebounding_dashboards.rds",  # nested - stays RDS
   path_rebounding_features  = "data_processed/team_rebounding_features.parquet",
 
+  path_player_rebounding_raw_cache = "data_raw/player_rebounding_dashboards.rds",  # nested - stays RDS
+  path_player_rebounding_features  = "data_processed/player_rebounding_features.parquet",
+
   path_schedule_with_travel = "data_processed/schedule_with_travel_detail.parquet",
   path_schedule_team_level  = "data_processed/schedule_team_level_final.parquet",
   path_team_game_features   = "data_processed/team_game_features.parquet",
@@ -73,6 +76,26 @@ cfg <- list(
   # after every single one (old script wrote the full file after
   # every row - far too much disk I/O once the table is large).
   rebounding_checkpoint_every = 25,
+
+  # ------------------------------------------------------------
+  # Player-level advanced rebounding stage (R/pull_player_rebounding.R)
+  # ------------------------------------------------------------
+  # Same idea as the team-level stage above (one API call per row, no
+  # bulk endpoint), but at player-game grain - ~11x more rows than the
+  # team version (105k+ vs ~9.8k), so scoped down by default:
+  player_rebounding_enabled = TRUE,
+
+  # Only these seasons are in scope for now - current season only, so
+  # the first backfill is ~5 hours instead of ~23. Widen this later
+  # (e.g. to season_sequence(cfg$first_season) for full history) once
+  # you're ready to let a longer backfill run.
+  player_rebounding_seasons = c("2025-26"),
+
+  # Skip garbage-time cameos below this many minutes played that game.
+  player_rebounding_min_minutes = 10,
+
+  throttle_player_rebounding_sec = 0.6,
+  player_rebounding_checkpoint_every = 100,
 
   # ------------------------------------------------------------
   # Rolling average windows (trailing N games), used by
