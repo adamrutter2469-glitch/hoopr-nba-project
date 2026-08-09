@@ -192,7 +192,7 @@ TABLE_SPECIFIC_OVERRIDES <- list(
   # attributed to the wrong API call).
   team_rebounding_features = setNames(
     lapply(names(STAT_GLOSSARY)[grepl("^adv_", names(STAT_GLOSSARY))], function(adv_name) {
-      list(description = sprintf("Actual %s recorded in this exact game (advanced tracking data).", STAT_GLOSSARY[[adv_name]]),
+      list(description = sprintf("Actual %s recorded in this exact game.", STAT_GLOSSARY[[adv_name]]),
            logic = NA_character_, sources = "hoopR::nba_teamdashptreb()", family = "raw_actual",
            leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game")
     }),

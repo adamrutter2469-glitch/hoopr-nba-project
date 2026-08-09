@@ -38,6 +38,17 @@ first if `data_processed/` is empty.
 - **`query_with_duckdb.py`** - the same kind of exploration via SQL
   instead of pandas, including querying the season-partitioned raw
   datasets under `data_raw/` directly without loading them fully.
+- **`data_dictionary.py`** - explore `docs/data_dictionary/*.csv` (what
+  the R side generates - see that folder's own README for the full
+  column reference) instead of hardcoding column knowledge here:
+  ```python
+  from data_dictionary import list_tables, list_fields
+
+  list_tables()                          # every table + description
+  list_fields("team_game_features")      # every field in one table
+  list_fields("team_game_features", leakage_risk="UNSAFE")   # just the columns
+  list_fields("team_game_features", feature_family="matchup")  # unsafe as a same-game predictor
+  ```
 
 ## Table reference
 
