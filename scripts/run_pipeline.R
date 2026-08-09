@@ -14,6 +14,8 @@
 #                               rebounding stage.
 #   --skip-r2-sync             Skip mirroring data_raw/ and
 #                               data_processed/ to Cloudflare R2.
+#   --skip-bbs-mapping         Skip rebuilding the Big Balls Sports
+#                               Data id-mapping bridge tables.
 #   None of these change config/config.R - useful for a fast
 #   verification run or a routine run when you don't want to wait on
 #   one of them.
@@ -30,6 +32,7 @@ suppressMessages({
   library(slider)
   library(tibble)
   library(arrow)
+  library(httr2)
 })
 
 source("config/config.R")
@@ -44,6 +47,9 @@ if ("--skip-player-rebounding" %in% args) {
 }
 if ("--skip-r2-sync" %in% args) {
   cfg$r2_sync_enabled <- FALSE
+}
+if ("--skip-bbs-mapping" %in% args) {
+  cfg$bbs_mapping_enabled <- FALSE
 }
 
 logger <- init_logger(cfg$path_logs)
@@ -73,6 +79,7 @@ run_stage <- function(name, expr) {
 }
 
 run_stage("Reference data",       refresh_reference_data(cfg, logger))
+run_stage("BBS id mapping",       refresh_bigballsdata_mapping(cfg, logger))
 run_stage("Schedule",             refresh_schedule(cfg, logger))
 run_stage("Team game logs",       refresh_team_game_logs(cfg, logger))
 run_stage("Player game logs",     refresh_player_game_logs(cfg, logger))

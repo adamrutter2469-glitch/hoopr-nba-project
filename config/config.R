@@ -56,6 +56,9 @@ cfg <- list(
   path_team_game_features   = "data_processed/team_game_features.parquet",
   path_player_game_features = "data_processed/player_game_features.parquet",
 
+  path_team_id_mapping   = "data_processed/team_id_mapping.parquet",
+  path_player_id_mapping = "data_processed/player_id_mapping.parquet",
+
   # ------------------------------------------------------------
   # API throttling (seconds slept between calls to be polite to
   # the NBA Stats API and avoid rate-limit errors)
@@ -133,5 +136,14 @@ cfg <- list(
   # "X GB / 10 GB (Y% utilized)" line (R/run_summary.R) - kept separate
   # from r2_max_storage_gb so the abort trigger and the reported quota
   # can't drift apart by accident if one is ever tuned independently.
-  r2_free_tier_gb = 10
+  r2_free_tier_gb = 10,
+
+  # ------------------------------------------------------------
+  # Big Balls Sports Data id-mapping bridge tables (R/pull_bigballsdata_mapping.R)
+  # ------------------------------------------------------------
+  # Optional - skips gracefully if BBS_API_KEY isn't set in .env.
+  # Free tier is 100 req/min, 1000/day - this stage uses ~55 calls
+  # total (1 for teams, ~54 paginated for players), well within it.
+  bbs_mapping_enabled = TRUE,
+  throttle_bbs_sec    = 0.3
 )

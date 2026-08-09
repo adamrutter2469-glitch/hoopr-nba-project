@@ -182,7 +182,13 @@ GLOBAL_OVERRIDES <- list(
   jersey_number = list(description = "Player's current jersey number.", logic = NA, sources = "hoopR::nba_playerindex()", family = "reference", leakage_risk = "safe"),
   position = list(description = "Player's listed position.", logic = NA, sources = "hoopR::nba_playerindex()", family = "reference", leakage_risk = "safe"),
   player_first_name = list(description = "Player's first name.", logic = NA, sources = "hoopR::nba_playerindex()", family = "metadata", leakage_risk = "safe"),
-  player_last_name = list(description = "Player's last name.", logic = NA, sources = "hoopR::nba_playerindex()", family = "metadata", leakage_risk = "safe")
+  player_last_name = list(description = "Player's last name.", logic = NA, sources = "hoopR::nba_playerindex()", family = "metadata", leakage_risk = "safe"),
+  # Big Balls Sports Data (bigballsdata.com) id-mapping bridge tables
+  team_name_full = list(description = "Team's full name (e.g. 'Golden State Warriors') - the join key used to build this mapping, since abbreviations differ between the two sources for 5 franchises.", logic = NA, sources = "teams_raw.hr_team_name_full", family = "identifier", leakage_risk = "safe"),
+  bbs_team_id = list(description = "This team's id in Big Balls Sports Data's system (UUID) - unrelated to our own numeric team_id.", logic = "Matched by normalized full team name.", sources = "bigballsdata.com /v1/teams", family = "identifier", leakage_risk = "safe"),
+  bbs_short_name = list(description = "Team abbreviation as Big Balls Sports Data spells it - differs from our team_abbreviation for 5 teams (GS/NO/SA/UTAH/WSH vs our GSW/NOP/SAS/UTA/WAS).", logic = NA, sources = "bigballsdata.com /v1/teams", family = "metadata", leakage_risk = "safe (metadata only)"),
+  bbs_player_id = list(description = "This player's id in Big Balls Sports Data's system (UUID) - unrelated to our own numeric player_id.", logic = "Matched by normalized name (diacritics/periods/whitespace stripped); name collisions on either side excluded rather than guessed at.", sources = "bigballsdata.com /v1/players", family = "identifier", leakage_risk = "safe"),
+  bbs_player_name = list(description = "Player's name as Big Balls Sports Data spells it - the join key used to build this mapping.", logic = NA, sources = "bigballsdata.com /v1/players", family = "metadata", leakage_risk = "safe (metadata only)")
 )
 
 # Columns whose meaning genuinely differs by table (would be wrong if
@@ -341,6 +347,12 @@ TABLES <- list(
   player_rebounding_features = list(path = cfg$path_player_rebounding_features, kind = "parquet",
     description = "Parsed advanced (shot-distance / contested) rebounding splits, one row per player per game. Player-grain analog of team_rebounding_features, plus a bonus shot-distance-of-miss split not available at the team level. Scoped by cfg$player_rebounding_seasons and cfg$player_rebounding_min_minutes (see config/config.R) - not necessarily every player-game like the other tables.",
     sources = "hoopR::nba_playerdashptreb() via data_raw/player_rebounding_dashboards.rds"),
+  team_id_mapping = list(path = cfg$path_team_id_mapping, kind = "parquet",
+    description = "Bridge table: our team_id <-> Big Balls Sports Data's bbs_team_id, one row per team. Matched by normalized full team name, not abbreviation - their canonical short_name differs from our tricode for 5 franchises (GS/NO/SA/UTAH/WSH vs our GSW/NOP/SAS/UTA/WAS). All 30 teams matched.",
+    sources = "teams_raw; bigballsdata.com /v1/teams"),
+  player_id_mapping = list(path = cfg$path_player_id_mapping, kind = "parquet",
+    description = "Bridge table: our player_id <-> Big Balls Sports Data's bbs_player_id, one row per player. Matched by normalized name; same-name collisions on either side (e.g. two different players sharing a name across NBA history) are excluded rather than guessed at. Not every player matches - name variations across the two sources account for the gap.",
+    sources = "players_raw; bigballsdata.com /v1/players"),
   schedule_with_travel_detail = list(path = cfg$path_schedule_with_travel, kind = "parquet",
     description = "One row per game, with home_*/away_* rest and travel columns side by side.",
     sources = "schedule; data_raw/external/nba_airport_flight_matrix.csv"),

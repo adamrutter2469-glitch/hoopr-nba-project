@@ -1,0 +1,7 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,team_id_mapping,"Bridge table: our team_id <-> Big Balls Sports Data's bbs_team_id, one row per team. Matched by normalized full team name, not abbreviation - their canonical short_name differs from our tricode for 5 franchises (GS/NO/SA/UTAH/WSH vs our GSW/NOP/SAS/UTA/WAS). All 30 teams matched.",NA,teams_raw; bigballsdata.com /v1/teams,NA,NA,NA
+2,team_id,Team's NBA Stats API identifier.,NA,hoopR API,character,identifier,safe
+3,team_abbreviation,Team's 3-letter abbreviation (e.g. 'LAL').,NA,hoopR API,character,metadata,safe (metadata only)
+4,team_name_full,"Team's full name (e.g. 'Golden State Warriors') - the join key used to build this mapping, since abbreviations differ between the two sources for 5 franchises.",NA,teams_raw.hr_team_name_full,character,identifier,safe
+5,bbs_team_id,This team's id in Big Balls Sports Data's system (UUID) - unrelated to our own numeric team_id.,Matched by normalized full team name.,bigballsdata.com /v1/teams,character,identifier,safe
+6,bbs_short_name,Team abbreviation as Big Balls Sports Data spells it - differs from our team_abbreviation for 5 teams (GS/NO/SA/UTAH/WSH vs our GSW/NOP/SAS/UTA/WAS).,NA,bigballsdata.com /v1/teams,character,metadata,safe (metadata only)

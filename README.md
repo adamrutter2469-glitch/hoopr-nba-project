@@ -34,6 +34,16 @@ local usage; the cap exists so a future bug that caused some table to balloon in
 turn into a surprise storage bill. `cfg$r2_warn_storage_gb` (default 5) logs a warning before
 that point.
 
+### Odds/props data (Big Balls Sports Data)
+
+`R/pull_bigballsdata_mapping.R` builds two bridge tables against [bigballsdata.com](https://bigballsdata.com)
+(free tier: 1,000 req/day) - `data_processed/team_id_mapping.parquet` and
+`player_id_mapping.parquet` - so a future odds/props pull from that API can join back to our own
+NBA-Stats-sourced ids. Neither source shares a key with ours (their ids are UUIDs; their team
+abbreviations differ from NBA.com's tricode for 5 franchises), so both are matched by normalized
+name rather than id, with same-name collisions on either side excluded rather than guessed at.
+Requires `BBS_API_KEY` in `.env` - skips itself if it's not set, same as the R2 sync.
+
 ## What you get
 
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel

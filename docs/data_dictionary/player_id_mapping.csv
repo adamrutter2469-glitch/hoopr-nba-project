@@ -1,0 +1,7 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,player_id_mapping,"Bridge table: our player_id <-> Big Balls Sports Data's bbs_player_id, one row per player. Matched by normalized name; same-name collisions on either side (e.g. two different players sharing a name across NBA history) are excluded rather than guessed at. Not every player matches - name variations across the two sources account for the gap.",NA,players_raw; bigballsdata.com /v1/players,NA,NA,NA
+2,player_id,Player's NBA Stats API identifier.,NA,hoopR API,character,identifier,safe
+3,player_name,Player's full name.,NA,hoopR::nba_leaguegamelog(),character,metadata,safe (metadata only)
+4,bbs_player_id,This player's id in Big Balls Sports Data's system (UUID) - unrelated to our own numeric player_id.,Matched by normalized name (diacritics/periods/whitespace stripped); name collisions on either side excluded rather than guessed at.,bigballsdata.com /v1/players,character,identifier,safe
+5,bbs_player_name,Player's name as Big Balls Sports Data spells it - the join key used to build this mapping.,NA,bigballsdata.com /v1/players,character,metadata,safe (metadata only)
+6,bbs_team_id,This team's id in Big Balls Sports Data's system (UUID) - unrelated to our own numeric team_id.,Matched by normalized full team name.,bigballsdata.com /v1/teams,character,identifier,safe
