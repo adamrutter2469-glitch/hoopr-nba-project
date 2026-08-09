@@ -31,6 +31,10 @@ Read either with `arrow::read_parquet("data_processed/team_game_features.parquet
 `arrow::open_dataset()` for the season-partitioned raw tables under `data_raw/` - see below), or
 from Python/PyCharm via `python/` - see `python/README.md`.
 
+For what every column means, see [`docs/data_dictionary/`](docs/data_dictionary/README.md) -
+one CSV per table, auto-generated from the live schema (`Rscript scripts/build_data_dictionary.R`),
+including which columns are safe pre-game predictors vs. that game's actual result.
+
 ## Layout
 
 ```
@@ -55,6 +59,7 @@ models/
   train_rebounds_model.R   REB prediction (elastic net + xgboost) - separate, user-run, not
                            wired into run_pipeline.bat. Trained model files are git-ignored.
 python/                    read-only exploration from PyCharm/Python - see python/README.md
+docs/data_dictionary/      one CSV per table describing every column - see its own README.md
 notes/                     unchanged from before the redesign
 ```
 

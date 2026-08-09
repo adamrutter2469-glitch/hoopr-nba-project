@@ -1,0 +1,20 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,schedule_with_travel_detail,"One row per game, with home_*/away_* rest and travel columns side by side.",NA,schedule; data_raw/external/nba_airport_flight_matrix.csv,NA,NA,NA
+2,season,"Season string, e.g. '2022-23'.","Set explicitly to the season being pulled, not trusted from the API's own inconsistently-typed season field - see R/pull_schedule.R.",NA,character,identifier,safe
+3,game_date,Calendar date the game was/will be played.,NA,hoopR API,Date,identifier,safe
+4,game_id_nba,NBA Stats API's canonical game identifier.,NA,hoopR API,character,identifier,safe
+5,game_id,"Alias of game_id_nba, kept for join compatibility with hoopR's raw schedule fields.",Set equal to game_id_nba.,game_id_nba,character,identifier,safe
+6,home_team_id,Home team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
+7,away_team_id,Away team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
+8,home_team_tricode,Home team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
+9,away_team_tricode,Away team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
+10,away_rest_days,Away team's rest_days for this game.,NA,rest_days,numeric,context,safe
+11,home_rest_days,Home team's rest_days for this game.,NA,rest_days,numeric,context,safe
+12,away_is_b2b,Away team's is_b2b for this game.,NA,is_b2b,logical,context,safe
+13,home_is_b2b,Home team's is_b2b for this game.,NA,is_b2b,logical,context,safe
+14,away_is_3in4,Away team's is_3in4 for this game.,NA,is_3in4,logical,context,safe
+15,home_is_3in4,Home team's is_3in4 for this game.,NA,is_3in4,logical,context,safe
+16,away_est_flight_time,Away team's est_flight_time for this game.,NA,est_flight_time,numeric,context,safe
+17,home_est_flight_time,Home team's est_flight_time for this game.,NA,est_flight_time,numeric,context,safe
+18,away_timezone_shift,Away team's time_zone_shift for this game.,NA,time_zone_shift,numeric,context,safe
+19,home_timezone_shift,Home team's time_zone_shift for this game.,NA,time_zone_shift,numeric,context,safe

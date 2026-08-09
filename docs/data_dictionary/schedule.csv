@@ -1,0 +1,9 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,schedule,"Regular-season game schedule (preseason excluded), one row per game.",NA,hoopR::nba_schedule(),NA,NA,NA
+2,game_date,Calendar date the game was/will be played.,NA,hoopR API,Date,identifier,safe
+3,game_id_nba,NBA Stats API's canonical game identifier.,NA,hoopR API,character,identifier,safe
+4,home_team_id,Home team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
+5,away_team_id,Away team's identifier.,NA,hoopR::nba_schedule(),integer,identifier,safe
+6,home_team_tricode,Home team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
+7,away_team_tricode,Away team's 3-letter code.,NA,hoopR::nba_schedule(),character,metadata,safe (metadata only)
+8,season,"Season string, e.g. '2022-23'.","Set explicitly to the season being pulled, not trusted from the API's own inconsistently-typed season field - see R/pull_schedule.R.",NA,character,identifier,safe

@@ -27,3 +27,15 @@ python/venv/
 __pycache__/
 *.pyc
 
+# PyCharm's own project state - machine-specific, not versioned.
+.idea/
+
+# Never commit secrets, regardless of where they land in the tree.
+*api_key*
+*apikey*
+*secret*
+*.pem
+*.key
+.env
+.env.*
+

@@ -1,0 +1,44 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,players_raw,"NBA player reference/master data (current player universe), fully refreshed every pipeline run.",NA,hoopR::nba_commonallplayers(); hoopR::nba_playerindex(),NA,NA,NA
+2,person_id,Player's NBA Stats API identifier (same identifier as player_id; this name comes from hoopR's raw player-reference endpoints).,NA,hoopR::nba_commonallplayers(); hoopR::nba_playerindex(),character,identifier,safe
+3,display_last_comma_first,"Player name formatted 'Last, First'.",NA,hoopR::nba_commonallplayers(),character,metadata,safe
+4,display_first_last,Player name formatted 'First Last'.,NA,hoopR::nba_commonallplayers(),character,metadata,safe
+5,rosterstatus,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+6,from_year.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+7,to_year.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+8,playercode,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+9,player_slug.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+10,team_id.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+11,team_city.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+12,team_name.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+13,team_abbreviation.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+14,team_code,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+15,team_slug.x,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+16,games_played_flag,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+17,otherleague_experience_ch,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+18,player_last_name,Player's last name.,NA,hoopR::nba_playerindex(),character,metadata,safe
+19,player_first_name,Player's first name.,NA,hoopR::nba_playerindex(),character,metadata,safe
+20,player_slug.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+21,team_id.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+22,team_slug.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+23,is_defunct,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+24,team_city.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+25,team_name.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+26,team_abbreviation.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+27,jersey_number,Player's current jersey number.,NA,hoopR::nba_playerindex(),character,reference,safe
+28,position,Player's listed position.,NA,hoopR::nba_playerindex(),character,reference,safe
+29,height,Player height.,NA,hoopR::nba_playerindex(),character,reference,safe
+30,weight,Player weight.,NA,hoopR::nba_playerindex(),character,reference,safe
+31,college,"Player's college, if any.",NA,hoopR::nba_playerindex(),character,reference,safe
+32,country,Player's home country.,NA,hoopR::nba_playerindex(),character,reference,safe
+33,draft_year,Year the player was drafted.,NA,hoopR::nba_playerindex(),character,reference,safe
+34,draft_round,Draft round.,NA,hoopR::nba_playerindex(),character,reference,safe
+35,draft_number,Overall draft pick number.,NA,hoopR::nba_playerindex(),character,reference,safe
+36,roster_status,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+37,pts,NEEDS REVIEW - a reference-context points figure from hoopR::nba_playerindex() (not tied to a specific game); confirm the exact time window (career/season-to-date) before relying on it.,NA,hoopR::nba_playerindex(),character,reference,NA
+38,reb,NEEDS REVIEW - a reference-context rebounds figure from hoopR::nba_playerindex() (not tied to a specific game); confirm the exact time window before relying on it.,NA,hoopR::nba_playerindex(),character,reference,NA
+39,ast,NEEDS REVIEW - a reference-context assists figure from hoopR::nba_playerindex() (not tied to a specific game); confirm the exact time window before relying on it.,NA,hoopR::nba_playerindex(),character,reference,NA
+40,stats_timeframe,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+41,from_year.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+42,to_year.y,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA
+43,supplemental_status,NEEDS REVIEW - not recognized by any auto-fill pattern or override; fill in by hand.,NA,NA,character,unclassified,NA

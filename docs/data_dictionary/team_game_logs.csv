@@ -1,0 +1,32 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,team_game_logs,"Team box scores, one row per team per game.",NA,hoopR::nba_leaguegamelog(player_or_team='T'),NA,NA,NA
+2,season_id,"hoopR's raw season identifier (e.g. '22022'), distinct from the human-readable 'season' column.",NA,hoopR::nba_leaguegamelog(),character,identifier,safe
+3,team_id,Team's NBA Stats API identifier.,NA,hoopR API,character,identifier,safe
+4,team_abbreviation,Team's 3-letter abbreviation (e.g. 'LAL').,NA,hoopR API,character,metadata,safe (metadata only)
+5,team_name,Team's full name.,NA,hoopR API,character,metadata,safe (metadata only)
+6,game_id_nba,NBA Stats API's canonical game identifier.,NA,hoopR API,character,identifier,safe
+7,game_date,Calendar date the game was/will be played.,NA,hoopR API,Date,identifier,safe
+8,matchup,"Human-readable matchup string, e.g. 'LAL vs. BOS' or 'LAL @ BOS'.",NA,hoopR::nba_leaguegamelog(),character,metadata,safe (metadata only)
+9,wl,Win ('W') or loss ('L') for this team in this game.,NA,hoopR::nba_leaguegamelog(),character,raw_actual,UNSAFE - this game's actual outcome
+10,min,Actual minutes played recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+11,fgm,Actual field goals made recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+12,fga,Actual field goals attempted recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+13,fg_pct,Actual field goal percentage recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+14,fg3m,Actual 3-pointers made recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+15,fg3a,Actual 3-pointers attempted recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+16,fg3_pct,Actual 3-point percentage recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+17,ftm,Actual free throws made recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+18,fta,Actual free throws attempted recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+19,ft_pct,Actual free throw percentage recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+20,oreb,Actual offensive rebounds recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+21,dreb,Actual defensive rebounds recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+22,reb,Actual total rebounds recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+23,ast,Actual assists recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+24,stl,Actual steals recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+25,blk,Actual blocks recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+26,tov,Actual turnovers recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+27,pf,Actual personal fouls recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+28,pts,Actual points scored recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+29,plus_minus,Actual plus/minus recorded in this exact game.,NA,hoopR::nba_leaguegamelog(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+30,video_available,"Whether NBA.com has video available for this game (metadata flag, not a performance stat).",NA,hoopR::nba_leaguegamelog(),numeric,metadata,safe (metadata only)
+31,season,"Season string, e.g. '2022-23'.","Set explicitly to the season being pulled, not trusted from the API's own inconsistently-typed season field - see R/pull_schedule.R.",NA,character,identifier,safe

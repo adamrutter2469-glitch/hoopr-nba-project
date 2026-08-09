@@ -1,0 +1,18 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,schedule_team_level_final,"schedule_with_travel_detail expanded to one row per team per game (2 rows per game), with opp_* columns for the opposing team's rest/travel that same game.",NA,schedule_with_travel_detail,NA,NA,NA
+2,game_id_nba,NBA Stats API's canonical game identifier.,NA,hoopR API,character,identifier,safe
+3,game_date,Calendar date the game was/will be played.,NA,hoopR API,Date,identifier,safe
+4,season,"Season string, e.g. '2022-23'.","Set explicitly to the season being pulled, not trusted from the API's own inconsistently-typed season field - see R/pull_schedule.R.",NA,character,identifier,safe
+5,team_id,Team's NBA Stats API identifier.,NA,hoopR API,integer,identifier,safe
+6,opponent_id,This game's opposing team's identifier.,NA,schedule.home_team_id / away_team_id,integer,identifier,safe
+7,home_away,Whether this team was the home or away team for this game.,NA,schedule.home_team_id / away_team_id,character,context,safe
+8,rest_days,Days of rest this team had entering this game (0 = a back-to-back). NA for a team's first game of the season.,"Days since this team's previous game in the same season, minus 1.",schedule.game_date (lagged per team/season),numeric,context,safe
+9,opp_rest_days,The opponent's rest_days for this same game.,NA,rest_days (opponent's row),numeric,context,safe
+10,is_b2b,TRUE if this team is playing on zero days of rest (a back-to-back).,rest_days == 0,rest_days,logical,context,safe
+11,opp_is_b2b,The opponent's is_b2b for this same game.,NA,opp_rest_days,logical,context,safe
+12,is_3in4,TRUE if this game is the second of two games within 2 days with <=1 rest day between them (a proxy for 3-games-in-4-nights fatigue).,rest_days <= 1 AND the previous game's rest_days was also <= 1.,rest_days,logical,context,safe
+13,opp_is_3in4,The opponent's is_3in4 for this same game.,NA,opp_rest_days,logical,context,safe
+14,est_flight_time,Estimated flight time (hours) from this team's previous game city to this game's city.,Looked up from the travel-time reference table by previous-city -> current-city.,data_raw/external/nba_airport_flight_matrix.csv,numeric,context,safe
+15,opp_est_flight_time,The opponent's est_flight_time for this same game.,NA,est_flight_time (opponent's row),numeric,context,safe
+16,time_zone_shift,Number of timezones crossed from this team's previous game city to this game's city.,Looked up from the travel-time reference table.,data_raw/external/nba_airport_flight_matrix.csv,numeric,context,safe
+17,opp_time_zone_shift,The opponent's time_zone_shift for this same game.,NA,time_zone_shift (opponent's row),numeric,context,safe
