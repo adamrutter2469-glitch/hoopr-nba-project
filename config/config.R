@@ -63,6 +63,7 @@ cfg <- list(
   path_player_turnover_features = "data_processed/player_turnover_features.parquet",
   path_player_block_features = "data_processed/player_block_features.parquet",
   path_player_foul_features = "data_processed/player_foul_features.parquet",
+  path_player_shot_zone_features = "data_processed/player_shot_zone_features.parquet",
 
   # ------------------------------------------------------------
   # API throttling (seconds slept between calls to be polite to

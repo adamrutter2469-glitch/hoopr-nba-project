@@ -460,6 +460,21 @@ classify_column <- function(col, table_key) {
       leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"))
   }
 
+  m <- regmatches(col, regexec("^fg[am]_(.+)$", col))[[1]]
+  if (length(m) == 2 && m[2] %in% c("above_the_break_3", "left_mid_range", "right_mid_range",
+                                     "center_mid_range", "left_corner_3", "right_corner_3",
+                                     "restricted_area", "paint_non_ra")) {
+    zone_label <- gsub("_", " ", m[2])
+    is_makes <- grepl("^fgm_", col)
+    return(list(
+      description = sprintf("Field goal %s from the %s zone in this exact game, mined from play_by_play shot coordinates.",
+                             if (is_makes) "makes" else "attempts", zone_label),
+      logic = "Every shooting_play row (free throws excluded) classified into one of 8 court zones via classify_shot_zone() in R/features_shot_zones.R, from coordinate_x/coordinate_y (feet, verified empirically against real court geometry - see file header). 2PT/3PT boundary verified against real recorded score_value: 99.966% match. Zone totals validated against player_game_logs.fga/fgm: 97.99%/99.4% exact match.",
+      sources = "play_by_play.coordinate_x; play_by_play.coordinate_y; play_by_play.athlete_id_1 (via espn_player_id_mapping)",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+
   # raw actual stat (this exact game's result)
   if (col %in% names(STAT_GLOSSARY)) {
     is_adv <- grepl("^adv_", col)
@@ -521,6 +536,9 @@ TABLES <- list(
     sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
   player_block_features = list(path = cfg$path_player_block_features, kind = "parquet",
     description = "Player-game grain block detail, mined from play_by_play (R/features_playbyplay_events.R) - one row per player per game player_game_logs has, 0s for types that didn't occur. Blocks have no dedicated type_text (a blocked shot just carries its normal shot type) - detected via a structural rule instead: a missed shot with a 2nd player attached can only be a block. Subdivided by shot category (dunk/layup/hook/tip/jump_shot). blk_* columns validated against player_game_logs.blk: 99.6% exact match. fg_blocked_* (how often a player's OWN shot gets blocked) has no official box-score equivalent to validate against - a genuinely new stat this data enables, not something the NBA box score tracks.",
+    sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
+  player_shot_zone_features = list(path = cfg$path_player_shot_zone_features, kind = "parquet",
+    description = "Player-game grain shot location detail, mined from play_by_play shot coordinates (R/features_shot_zones.R) - one row per player per game player_game_logs has, 0s for zones with no attempts. Every shot classified into 8 court zones (restricted area, paint non-RA, left/center/right mid-range, left/right corner 3, above-the-break 3) via geometric rules verified against real court dimensions, since NBA's own shot-location dashboard endpoints are currently broken (see play_by_play table description). The 2PT/3PT boundary was checked against actual recorded shot values before trusting it for anything (99.966% match); zone totals validated against player_game_logs.fga/fgm (97.99%/99.4% exact match). Free throws are correctly excluded (they're not field goal attempts and don't reflect real shot-selection location).",
     sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
   player_foul_features = list(path = cfg$path_player_foul_features, kind = "parquet",
     description = "Player-game grain foul detail, mined from play_by_play (R/features_playbyplay_events.R) - one row per player per game player_game_logs has, 0s for types that didn't occur. Three views built from the same underlying events: pf_<type> (foul subtype - shooting/personal/loose ball/offensive/flagrant/etc.), pf_q1..pf_q4/pf_ot (WHEN in the game fouls happened - the box score's end-of-game total can't answer this), and elapsed_seconds_at_pf_2/3/6 (the exact game-clock moment - continuous across regulation and OT - a player reached that many fouls, NA if they never did). The PF-eligible foul type set (which type_texts count toward the real 6-foul disqualification) was chosen empirically by testing candidate sets against player_game_logs.pf directly, not assumed from rulebook memory: base foul types + Flagrant Fouls won at 96.05% exact match; Technical Fouls (even 'double' ones) do not count and are excluded. 'Offensive Foul' and 'Offensive Foul Turnover' were verified to be the SAME real event logged as two separate play_by_play rows (100% overlap) - only 'Offensive Foul' is counted here to avoid double-counting; the turnover side already lives in player_turnover_features.",

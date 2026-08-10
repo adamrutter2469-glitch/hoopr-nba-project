@@ -107,6 +107,19 @@ Technical Fouls (even "double" ones) don't count and are excluded. Also caught a
 separate rows (100% overlap verified) - only one is counted here to avoid double-counting,
 since the other already lives in the turnover table.
 
+A fourth table, `player_shot_zone_features.parquet` (`R/features_shot_zones.R`), classifies
+every shot attempt into one of 8 court zones (restricted area, paint non-RA, left/center/right
+mid-range, left/right corner 3, above-the-break 3) from `coordinate_x`/`coordinate_y` -
+NBA's own shot-location dashboard endpoints are broken (see the play-by-play section above),
+so this replicates that zone taxonomy from the raw coordinates instead. Nothing about the
+coordinate system was assumed: units (feet), orientation, and hoop position were all verified
+against real court geometry first (dunks cluster right at the real hoop position, ~41.75 ft
+from center court), and the 2PT/3PT boundary was checked against actual recorded shot values
+before trusting it for anything (99.966% match). One real bug caught before it corrupted
+anything: `shooting_play == TRUE` also includes free throws, which aren't field goal attempts
+and don't reflect real shot-selection location - excluding them was what took the zone-total
+validation from 44% match to 97.99%/99.4% (FGA/FGM).
+
 ## What you get
 
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel
