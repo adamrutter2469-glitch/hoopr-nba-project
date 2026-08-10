@@ -51,6 +51,8 @@ target, or for post-game analysis). `NA` means unclassified - check the column y
 | [`team_id_mapping`](team_id_mapping.csv) | 30 x 5 | 1 row/team - bridge to Big Balls Sports Data's team ids. |
 | [`player_id_mapping`](player_id_mapping.csv) | 4,731 x 5 | 1 row/player - bridge to Big Balls Sports Data's player ids. |
 | [`espn_player_id_mapping`](espn_player_id_mapping.csv) | 870 x 4 | 1 row/player - bridge to ESPN's athlete ids (play_by_play). |
+| [`player_turnover_features`](player_turnover_features.csv) | 105,253 x 27 | 1 row/player-game - turnover detail mined from play_by_play (bad pass, lost ball, offensive foul, traveling, ...), plus steals forced. 92.83% exact match to player_game_logs.tov (gap is a real ESPN data limit, not a bug - see table description). |
+| [`player_block_features`](player_block_features.csv) | 105,253 x 14 | 1 row/player-game - block detail mined from play_by_play, by shot type (dunk/layup/hook/tip/jump_shot). 99.6% exact match to player_game_logs.blk. Also includes fg_blocked_* - how often a player's own shot gets blocked, a stat the box score doesn't track at all. |
 | [`schedule_with_travel_detail`](schedule_with_travel_detail.csv) | 5,303 x 18 | 1 row/game. |
 | [`schedule_team_level_final`](schedule_team_level_final.csv) | 10,606 x 16 | 1 row/team-game. |
 | [`schedule`](schedule.csv) | 5,303 x 10 | 1 row/game - raw pull. |

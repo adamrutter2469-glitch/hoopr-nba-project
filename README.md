@@ -70,6 +70,30 @@ excluded rather than guessed at - into `data_processed/espn_player_id_mapping.pa
 building: zero name collisions at any grain (team+game, team+season, or fully global) within
 this project's season scope, though the exclusion logic stays in as a safety net regardless.
 
+### Play-by-play event mining
+
+`R/features_playbyplay_events.R` mines play_by_play's `type_text` + athlete roles into
+player-game grain detail tables - `data_processed/player_turnover_features.parquet` (turnover
+subtype: bad pass, lost ball, offensive foul, traveling, ... plus steals forced) and
+`player_block_features.parquet` (blocks by shot type: dunk/layup/hook/tip/jump_shot, plus
+`fg_blocked_*` - how often a player's own shot gets blocked, which the box score never tracks
+at all). Both use a **long-format** intermediate representation - each relevant play expands
+into one row per involved player rather than staying one row per play with separate
+`athlete_1`/`athlete_2` columns - so the final aggregate is a single `group_by` + count, and it
+generalizes to future event types with 3 actors without any new join logic.
+
+The athlete-role convention is **type-specific, not uniform** - `athlete_1` means "who
+committed it" for turnovers but "the shooter" (not the blocker!) for blocked shots - discovered
+empirically before building anything, not assumed. Blocks in particular have no dedicated
+`type_text` at all (a blocked shot just carries its normal shot type); detection is a
+structural rule instead - a missed shot with a 2nd player attached can only be a block, since
+assists only ever attach to made shots.
+
+Both tables are validated every run against `player_game_logs`' own trusted totals
+(`tov`/`blk`) - turnovers land at 92.83% exact match (the gap is a real, structural ESPN
+limitation: 5 turnover types, like shot-clock violations, never name a player at all in ESPN's
+feed even though the NBA box score credits someone - not a bug), blocks at 99.6%.
+
 ## What you get
 
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel

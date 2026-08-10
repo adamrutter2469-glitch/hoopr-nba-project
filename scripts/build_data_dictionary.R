@@ -380,6 +380,50 @@ classify_column <- function(col, table_key) {
       family = "own_rolling", leakage_risk = "safe (known pre-game)"
     ))
   }
+  # play-by-play-mined event-detail columns (R/features_playbyplay_events.R) -
+  # checked before the raw-stat fallback below since none of these
+  # collide with a bare STAT_GLOSSARY key (they're all prefixed/suffixed).
+  m <- regmatches(col, regexec("^tov_(.+)$", col))[[1]]
+  if (length(m) == 2) {
+    label <- gsub("_", " ", m[2])
+    return(list(
+      description = sprintf("Turnovers of type '%s' this player committed in this exact game, mined from play_by_play event text.", label),
+      logic = "Counted from play_by_play rows where type_text matches this turnover subtype and this player is athlete_1 (who committed it). NOTE: 5 turnover types (shot clock, 5/8-second, excess timeout, too many players) never name a player in ESPN's feed at all - those turnovers count toward player_game_logs.tov but can't be broken out here (~7% of all turnovers, verified empirically - see player_turnover_features table description).",
+      sources = "play_by_play.type_text; play_by_play.athlete_id_1 (via espn_player_id_mapping)",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+  m <- regmatches(col, regexec("^stl_(.+)$", col))[[1]]
+  if (length(m) == 2) {
+    label <- gsub("_", " ", m[2])
+    return(list(
+      description = sprintf("Steals this player got by forcing a '%s' turnover in this exact game, mined from play_by_play event text.", label),
+      logic = "Counted from play_by_play rows where type_text matches this turnover subtype and this player is athlete_2 (who forced/stole it) - only Bad Pass and Lost Ball turnovers ever populate a second player (verified empirically: every other turnover type is 0%).",
+      sources = "play_by_play.type_text; play_by_play.athlete_id_2 (via espn_player_id_mapping)",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+  m <- regmatches(col, regexec("^blk_(.+)$", col))[[1]]
+  if (length(m) == 2) {
+    label <- gsub("_", " ", m[2])
+    return(list(
+      description = sprintf("Blocks this player recorded against a %s shot in this exact game, mined from play_by_play.", label),
+      logic = "Counted from play_by_play rows where shooting_play is TRUE, the shot missed, and athlete_id_2 is populated (a missed shot with a 2nd player attached can only be a block - verified empirically), and this player is athlete_2 (the blocker). Shot type bucketed into dunk/layup/hook/tip/jump_shot via clean_shot_category().",
+      sources = "play_by_play.type_text (bucketed); play_by_play.athlete_id_2 (via espn_player_id_mapping)",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+  m <- regmatches(col, regexec("^fg_blocked_(.+)$", col))[[1]]
+  if (length(m) == 2) {
+    label <- gsub("_", " ", m[2])
+    return(list(
+      description = sprintf("Times this player's own %s attempt was blocked in this exact game - a stat the official NBA box score doesn't track at all (no player_game_logs equivalent to validate against), mined from play_by_play.", label),
+      logic = "Counted from play_by_play rows where shooting_play is TRUE, the shot missed, and athlete_id_2 is populated, and this player is athlete_1 (the shooter whose shot was blocked).",
+      sources = "play_by_play.type_text (bucketed); play_by_play.athlete_id_1 (via espn_player_id_mapping)",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+
   # raw actual stat (this exact game's result)
   if (col %in% names(STAT_GLOSSARY)) {
     is_adv <- grepl("^adv_", col)
@@ -436,6 +480,12 @@ TABLES <- list(
   espn_player_id_mapping = list(path = cfg$path_espn_player_id_mapping, kind = "parquet",
     description = "Bridge table: our player_id <-> ESPN's athlete_id (as used in play_by_play), one row per player. Matched by normalized name; same-name collisions on either side excluded rather than guessed at (empirically verified zero collisions at any grain - team+game, team+season, or fully global - within this project's season scope before building). Most of players_raw doesn't match, which is expected: it's the full historical player reference table, while this bridge only covers players who actually appeared in the seasons play_by_play has been pulled for.",
     sources = "players_raw; play_by_play"),
+  player_turnover_features = list(path = cfg$path_player_turnover_features, kind = "parquet",
+    description = "Player-game grain turnover detail, mined from play_by_play's type_text + athlete roles (R/features_playbyplay_events.R) - one row per player per game, every game player_game_logs has, with 0s for event types that didn't occur (not missing rows). 23 event columns (tov_bad_pass, tov_lost_ball, tov_offensive_foul, tov_traveling, ... plus stl_bad_pass/stl_lost_ball for steals forced by causing those two specific turnover types - the only ones ESPN ever attaches a second player to). Validated against player_game_logs.tov: 92.83% of player-games sum exactly - the gap is a real, structural ESPN data limitation (5 turnover types - shot clock, 5/8-second, excess timeout, too many players - never name a player at all in ESPN's feed, even though the NBA box score does credit someone), not a bug in the derivation.",
+    sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
+  player_block_features = list(path = cfg$path_player_block_features, kind = "parquet",
+    description = "Player-game grain block detail, mined from play_by_play (R/features_playbyplay_events.R) - one row per player per game player_game_logs has, 0s for types that didn't occur. Blocks have no dedicated type_text (a blocked shot just carries its normal shot type) - detected via a structural rule instead: a missed shot with a 2nd player attached can only be a block. Subdivided by shot category (dunk/layup/hook/tip/jump_shot). blk_* columns validated against player_game_logs.blk: 99.6% exact match. fg_blocked_* (how often a player's OWN shot gets blocked) has no official box-score equivalent to validate against - a genuinely new stat this data enables, not something the NBA box score tracks.",
+    sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
   schedule_with_travel_detail = list(path = cfg$path_schedule_with_travel, kind = "parquet",
     description = "One row per game, with home_*/away_* rest and travel columns side by side.",
     sources = "schedule; data_raw/external/nba_airport_flight_matrix.csv"),
