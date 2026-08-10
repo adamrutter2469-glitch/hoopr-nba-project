@@ -62,6 +62,14 @@ All-Star/exhibition game with no NBA Stats regular-season/playoff counterpart. E
 abbreviations differ from NBA.com's tricode for 6 franchises (`NY`/`GS`/`SA`/`UTAH`/`WSH`/`NO`
 vs. our `NYK`/`GSW`/`SAS`/`UTA`/`WAS`/`NOP`) - see `ESPN_ABBREV_FIX` in `R/pull_playbyplay.R`.
 
+Same problem exists at the *player* level: play-by-play events reference ESPN's own
+`athlete_id`/`athlete_name` (in `athlete_id_1/2/3`), not our `player_id`. Bridged the same way
+as the bigballsdata mapping - normalized-name matching, same-name collisions on either side
+excluded rather than guessed at - into `data_processed/espn_player_id_mapping.parquet`
+(`build_espn_player_id_mapping()` in `R/pull_playbyplay.R`). Verified empirically before
+building: zero name collisions at any grain (team+game, team+season, or fully global) within
+this project's season scope, though the exclusion logic stays in as a safety net regardless.
+
 ## What you get
 
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel

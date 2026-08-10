@@ -59,6 +59,7 @@ cfg <- list(
 
   path_team_id_mapping   = "data_processed/team_id_mapping.parquet",
   path_player_id_mapping = "data_processed/player_id_mapping.parquet",
+  path_espn_player_id_mapping = "data_processed/espn_player_id_mapping.parquet",
 
   # ------------------------------------------------------------
   # API throttling (seconds slept between calls to be polite to

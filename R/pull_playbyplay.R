@@ -149,3 +149,78 @@ refresh_playbyplay <- function(cfg, logger) {
 
   invisible(NULL)
 }
+
+# ------------------------------------------------------------
+# ESPN player-id bridge: athlete_id/athlete_name (as they appear
+# across athlete_id_1/2/3 in play_by_play) <-> our player_id. Same
+# same-name-collision-exclusion pattern as build_player_mapping() in
+# R/pull_bigballsdata_mapping.R, and empirically verified safe at
+# this data's scope before building: zero normalized-name collisions
+# at team+game, team+season, OR even fully global grain across all 4
+# seasons in play_by_play (checked directly against player_game_logs
+# before writing this function) - but the exclusion logic is kept
+# anyway as a safety net rather than assuming that holds forever.
+#
+# A person-level 1:1 table (not scoped to team/game/season) since
+# both athlete_id and player_id are meant to identify the same PERSON
+# permanently, regardless of which team they were on when a given
+# play happened.
+# ------------------------------------------------------------
+build_espn_player_id_mapping <- function(cfg, logger) {
+  pbp <- read_full_dataset(cfg$path_playbyplay_dataset)
+  if (is.null(pbp)) {
+    logger$log("ESPN player mapping: SKIPPED, no play_by_play data yet.")
+    return(invisible(NULL))
+  }
+
+  espn_players <- dplyr::bind_rows(
+    pbp %>% dplyr::transmute(athlete_id = athlete_id_1, athlete_name = athlete_name_1),
+    pbp %>% dplyr::transmute(athlete_id = athlete_id_2, athlete_name = athlete_name_2),
+    pbp %>% dplyr::transmute(athlete_id = athlete_id_3, athlete_name = athlete_name_3)
+  ) %>%
+    dplyr::filter(!is.na(athlete_id)) %>%
+    dplyr::distinct(athlete_id, athlete_name) %>%
+    dplyr::mutate(match_key = normalize_name(athlete_name))
+
+  our_players <- read_parquet_or_null(cfg$path_players_raw)
+  if (is.null(our_players)) {
+    logger$log("ESPN player mapping: SKIPPED, no players_raw.parquet yet.")
+    return(invisible(NULL))
+  }
+  our_players <- our_players %>% dplyr::mutate(match_key = normalize_name(display_first_last))
+
+  our_dupe_keys  <- our_players  %>% dplyr::count(match_key) %>% dplyr::filter(n > 1) %>% dplyr::pull(match_key)
+  espn_dupe_keys <- espn_players %>% dplyr::count(match_key) %>% dplyr::filter(n > 1) %>% dplyr::pull(match_key)
+  ambiguous_keys <- union(our_dupe_keys, espn_dupe_keys)
+
+  our_safe  <- our_players  %>% dplyr::filter(!match_key %in% ambiguous_keys)
+  espn_safe <- espn_players %>% dplyr::filter(!match_key %in% ambiguous_keys)
+
+  matched <- dplyr::inner_join(our_safe, espn_safe, by = "match_key")
+
+  n_ambiguous      <- length(ambiguous_keys)
+  n_our_unmatched  <- nrow(our_safe) - nrow(matched)
+  n_espn_unmatched <- nrow(espn_safe) - nrow(matched)
+
+  mapping <- matched %>%
+    dplyr::transmute(
+      player_id       = as.character(person_id),
+      player_name     = display_first_last,
+      athlete_id_espn = as.character(athlete_id),
+      athlete_name_espn = athlete_name
+    )
+
+  write_parquet(mapping, cfg$path_espn_player_id_mapping)
+  logger$log("  ", cfg$path_espn_player_id_mapping, " written (", nrow(mapping), " players matched, ",
+             n_ambiguous, " ambiguous name(s) excluded, ",
+             n_our_unmatched, " of ours unmatched, ", n_espn_unmatched, " of ESPN's unmatched)")
+  mapping
+}
+
+refresh_espn_player_mapping <- function(cfg, logger) {
+  if (!isTRUE(cfg$playbyplay_enabled)) {
+    logger$log("ESPN player mapping: SKIPPED (cfg$playbyplay_enabled = FALSE).")
+    return(invisible(NULL))
+  }
+  build_espn_player_id_mapping(cfg, logger)
+}

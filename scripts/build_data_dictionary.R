@@ -188,7 +188,11 @@ GLOBAL_OVERRIDES <- list(
   bbs_team_id = list(description = "This team's id in Big Balls Sports Data's system (UUID) - unrelated to our own numeric team_id.", logic = "Matched by normalized full team name.", sources = "bigballsdata.com /v1/teams", family = "identifier", leakage_risk = "safe"),
   bbs_short_name = list(description = "Team abbreviation as Big Balls Sports Data spells it - differs from our team_abbreviation for 5 teams (GS/NO/SA/UTAH/WSH vs our GSW/NOP/SAS/UTA/WAS).", logic = NA, sources = "bigballsdata.com /v1/teams", family = "metadata", leakage_risk = "safe (metadata only)"),
   bbs_player_id = list(description = "This player's id in Big Balls Sports Data's system (UUID) - unrelated to our own numeric player_id.", logic = "Matched by normalized name (diacritics/periods/whitespace stripped); name collisions on either side excluded rather than guessed at.", sources = "bigballsdata.com /v1/players", family = "identifier", leakage_risk = "safe"),
-  bbs_player_name = list(description = "Player's name as Big Balls Sports Data spells it - the join key used to build this mapping.", logic = NA, sources = "bigballsdata.com /v1/players", family = "metadata", leakage_risk = "safe (metadata only)")
+  bbs_player_name = list(description = "Player's name as Big Balls Sports Data spells it - the join key used to build this mapping.", logic = NA, sources = "bigballsdata.com /v1/players", family = "metadata", leakage_risk = "safe (metadata only)"),
+  # ESPN player-id bridge (R/pull_playbyplay.R) - lets any future
+  # play-by-play mining join back to our own player_id.
+  athlete_id_espn = list(description = "This player's id in ESPN's system (as used in play_by_play's athlete_id_1/2/3) - unrelated to our own numeric player_id.", logic = "Matched by normalized name; name collisions on either side excluded rather than guessed at (empirically verified zero collisions within this project's season scope before building, but the exclusion logic is kept as a safety net regardless).", sources = "play_by_play.athlete_id_1/2/3", family = "identifier", leakage_risk = "safe"),
+  athlete_name_espn = list(description = "Player's name as ESPN spells it in play_by_play - the join key used to build this mapping.", logic = NA, sources = "play_by_play.athlete_name_1/2/3", family = "metadata", leakage_risk = "safe (metadata only)")
 )
 
 # Columns whose meaning genuinely differs by table (would be wrong if
@@ -429,6 +433,9 @@ TABLES <- list(
   player_id_mapping = list(path = cfg$path_player_id_mapping, kind = "parquet",
     description = "Bridge table: our player_id <-> Big Balls Sports Data's bbs_player_id, one row per player. Matched by normalized name; same-name collisions on either side (e.g. two different players sharing a name across NBA history) are excluded rather than guessed at. Not every player matches - name variations across the two sources account for the gap.",
     sources = "players_raw; bigballsdata.com /v1/players"),
+  espn_player_id_mapping = list(path = cfg$path_espn_player_id_mapping, kind = "parquet",
+    description = "Bridge table: our player_id <-> ESPN's athlete_id (as used in play_by_play), one row per player. Matched by normalized name; same-name collisions on either side excluded rather than guessed at (empirically verified zero collisions at any grain - team+game, team+season, or fully global - within this project's season scope before building). Most of players_raw doesn't match, which is expected: it's the full historical player reference table, while this bridge only covers players who actually appeared in the seasons play_by_play has been pulled for.",
+    sources = "players_raw; play_by_play"),
   schedule_with_travel_detail = list(path = cfg$path_schedule_with_travel, kind = "parquet",
     description = "One row per game, with home_*/away_* rest and travel columns side by side.",
     sources = "schedule; data_raw/external/nba_airport_flight_matrix.csv"),

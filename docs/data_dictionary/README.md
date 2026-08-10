@@ -50,6 +50,7 @@ target, or for post-game analysis). `NA` means unclassified - check the column y
 | [`play_by_play`](play_by_play.csv) | 2,501,259 x 66 | 1 row/play - event-level, ESPN-sourced (`hoopR::load_nba_pbp()`); `game_id_nba` bridged in from the schedule. |
 | [`team_id_mapping`](team_id_mapping.csv) | 30 x 5 | 1 row/team - bridge to Big Balls Sports Data's team ids. |
 | [`player_id_mapping`](player_id_mapping.csv) | 4,731 x 5 | 1 row/player - bridge to Big Balls Sports Data's player ids. |
+| [`espn_player_id_mapping`](espn_player_id_mapping.csv) | 870 x 4 | 1 row/player - bridge to ESPN's athlete ids (play_by_play). |
 | [`schedule_with_travel_detail`](schedule_with_travel_detail.csv) | 5,303 x 18 | 1 row/game. |
 | [`schedule_team_level_final`](schedule_team_level_final.csv) | 10,606 x 16 | 1 row/team-game. |
 | [`schedule`](schedule.csv) | 5,303 x 10 | 1 row/game - raw pull. |

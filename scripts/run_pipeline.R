@@ -18,7 +18,10 @@
 #                               Data id-mapping bridge tables.
 #   --skip-bbs-odds            Skip today's rebounds-prop archive
 #                               snapshot.
-#   --skip-playbyplay          Skip the play-by-play pull.
+#   --skip-playbyplay          Skip the play-by-play pull AND the ESPN
+#                               player-id mapping stage (shares the
+#                               same cfg$playbyplay_enabled toggle,
+#                               since the mapping depends on it).
 #   None of these change config/config.R - useful for a fast
 #   verification run or a routine run when you don't want to wait on
 #   one of them.
@@ -93,6 +96,7 @@ run_stage("Schedule",             refresh_schedule(cfg, logger))
 run_stage("Team game logs",       refresh_team_game_logs(cfg, logger))
 run_stage("Player game logs",     refresh_player_game_logs(cfg, logger))
 run_stage("Play-by-play",         refresh_playbyplay(cfg, logger))
+run_stage("ESPN player mapping",  refresh_espn_player_mapping(cfg, logger))
 run_stage("Rest/travel features", refresh_rest_travel_features(cfg, logger))
 stage_results$team_rebounding   <- run_stage("Advanced rebounding",  refresh_rebounding_features(cfg, logger))
 stage_results$player_rebounding <- run_stage("Player rebounding",    refresh_player_rebounding_features(cfg, logger))
