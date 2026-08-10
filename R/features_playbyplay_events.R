@@ -241,3 +241,165 @@ refresh_block_features <- function(cfg, logger) {
              length(event_cols), " event columns).")
   full
 }
+
+# ============================================================
+# Fouls - three views built from one shared long-format base table:
+# subtype breakdown (mirrors turnovers), WHEN in the game they
+# happened (period-bucketed counts + specific foul-number timing),
+# since "does this player get into foul trouble early" is a timing
+# question the box score's end-of-game total can never answer.
+#
+# PF-eligible types (which type_texts count toward the real 6-foul
+# disqualification limit) chosen empirically, not from rulebook
+# memory alone - tested 3 candidate sets against player_game_logs.pf
+# directly: base foul types alone (95.41% match) vs base + Flagrant
+# Fouls (96.05% - the winner) vs also including Double Technical
+# Foul (95.51%, worse) - confirms flagrants count toward personal
+# fouls but technicals (even "double" ones) don't, matching the real
+# rulebook, verified rather than assumed.
+#
+# "Offensive Foul" vs "Offensive Foul Turnover" - verified these are
+# the SAME real event logged as two separate PBP rows (100% of
+# Offensive Foul rows have a matching Offensive Foul Turnover row at
+# the identical game+player+instant). Using "Offensive Foul" here and
+# leaving "Offensive Foul Turnover" where it already lives (the
+# turnover table) - counting both here would double-count every
+# charge.
+#
+# athlete_2 is credited too when present (Double Personal Foul is the
+# only PF-eligible type where this happens in practice, ~93% of the
+# time - verified empirically, so no type-specific branching needed,
+# same structural-rule approach as blocks).
+# ============================================================
+PF_ELIGIBLE_TYPES <- c(
+  "Shooting Foul", "Personal Foul", "Loose Ball Foul", "Offensive Foul",
+  "Personal Take Foul", "Transition Take Foul", "Away from Play Foul",
+  "Clear Path Foul", "Double Personal Foul",
+  "Flagrant Foul Type 1", "Flagrant Foul Type 2"
+)
+
+clean_foul_key <- function(type_text) {
+  type_text <- gsub("\n", " ", type_text)
+  type_text <- sub(" Foul$", "", type_text)
+  type_text <- tolower(type_text)
+  type_text <- gsub("[^a-z0-9]+", "_", type_text)
+  gsub("^_+|_+$", "", type_text)
+}
+
+# start_game_seconds_remaining counts down continuously across ALL of
+# regulation (2880 at tip-off -> 0 at end of Q4 - verified empirically:
+# period 1 alone ranges 2880 down to 2160, i.e. it does NOT reset each
+# quarter), then resets to be PERIOD-relative once OT starts (each OT
+# period independently ranges 300 -> 0). So "seconds elapsed since
+# tipoff" is a straight subtraction in regulation, and only needs the
+# period-offset adjustment for OT.
+compute_elapsed_seconds <- function(period_number, start_game_seconds_remaining) {
+  ifelse(period_number <= 4,
+         2880 - start_game_seconds_remaining,
+         2880 + (period_number - 5) * 300 + (300 - start_game_seconds_remaining))
+}
+
+# ------------------------------------------------------------
+# Shared long-format base: one row per player per PF-eligible foul
+# event, with the subtype key, period bucket, and elapsed-seconds
+# timestamp all attached - every downstream view (subtype counts,
+# period counts, milestone timing) aggregates from this same table.
+# ------------------------------------------------------------
+build_foul_long_base <- function(cfg, logger) {
+  pbp <- read_full_dataset(cfg$path_playbyplay_dataset)
+  if (is.null(pbp)) {
+    logger$log("Foul event features: SKIPPED, no play_by_play data yet.")
+    return(invisible(NULL))
+  }
+  espn_map <- read_parquet_or_null(cfg$path_espn_player_id_mapping)
+  if (is.null(espn_map)) {
+    logger$log("Foul event features: SKIPPED, no espn_player_id_mapping.parquet yet.")
+    return(invisible(NULL))
+  }
+
+  fouls <- pbp %>%
+    dplyr::filter(gsub("\n", " ", type_text) %in% PF_ELIGIBLE_TYPES) %>%
+    dplyr::mutate(
+      event_key = clean_foul_key(type_text),
+      period_bucket = ifelse(period_number <= 4, paste0("q", period_number), "ot"),
+      elapsed_seconds = compute_elapsed_seconds(period_number, start_game_seconds_remaining)
+    )
+
+  committer1 <- fouls %>% dplyr::filter(!is.na(athlete_id_1)) %>%
+    dplyr::transmute(athlete_id_espn = as.character(athlete_id_1), game_id_nba, season,
+                      event_key, period_bucket, elapsed_seconds)
+  committer2 <- fouls %>% dplyr::filter(!is.na(athlete_id_2)) %>%
+    dplyr::transmute(athlete_id_espn = as.character(athlete_id_2), game_id_nba, season,
+                      event_key, period_bucket, elapsed_seconds)
+
+  long <- dplyr::bind_rows(committer1, committer2) %>%
+    dplyr::inner_join(espn_map %>% dplyr::select(athlete_id_espn, player_id), by = "athlete_id_espn")
+
+  n_dropped <- (nrow(committer1) + nrow(committer2)) - nrow(long)
+  if (n_dropped > 0) {
+    logger$log("  ", n_dropped, " foul-event row(s) dropped (athlete not in espn_player_id_mapping).")
+  }
+  long
+}
+
+# ------------------------------------------------------------
+# Orchestration: subtype counts (pf_<type>) + period counts
+# (pf_q1..pf_q4/pf_ot) + milestone timing (elapsed_seconds_at_pf_2/
+# 3/6 - foul trouble threshold, foul trouble by half, foul-out) all
+# joined onto the full player_game_logs grain. pf_<type> columns
+# validated against player_game_logs$pf (the milestone/period columns
+# have no independent box-score total to check against, since the
+# box score doesn't track foul timing at all - that's the whole
+# point of building this from play_by_play).
+# ------------------------------------------------------------
+refresh_foul_features <- function(cfg, logger) {
+  long <- build_foul_long_base(cfg, logger)
+  if (is.null(long)) return(invisible(NULL))
+
+  subtype_wide <- long %>%
+    dplyr::count(player_id, game_id_nba, season, event_key) %>%
+    dplyr::mutate(col = paste0("pf_", event_key)) %>%
+    dplyr::select(-event_key) %>%
+    tidyr::pivot_wider(names_from = col, values_from = n, values_fill = 0)
+
+  period_wide <- long %>%
+    dplyr::count(player_id, game_id_nba, season, period_bucket) %>%
+    dplyr::mutate(col = paste0("pf_", period_bucket)) %>%
+    dplyr::select(-period_bucket) %>%
+    tidyr::pivot_wider(names_from = col, values_from = n, values_fill = 0)
+
+  milestones <- long %>%
+    dplyr::group_by(player_id, game_id_nba, season) %>%
+    dplyr::arrange(elapsed_seconds, .by_group = TRUE) %>%
+    dplyr::mutate(foul_number = dplyr::row_number()) %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(foul_number %in% c(2, 3, 6)) %>%
+    dplyr::transmute(player_id, game_id_nba, season,
+                      col = paste0("elapsed_seconds_at_pf_", foul_number), elapsed_seconds) %>%
+    tidyr::pivot_wider(names_from = col, values_from = elapsed_seconds)
+
+  logs <- read_full_dataset(cfg$path_player_logs_dataset) %>%
+    dplyr::select(player_id, game_id_nba, season, pf)
+
+  subtype_cols <- setdiff(names(subtype_wide), c("player_id", "game_id_nba", "season"))
+  period_cols  <- setdiff(names(period_wide),  c("player_id", "game_id_nba", "season"))
+
+  full <- logs %>%
+    dplyr::left_join(subtype_wide, by = c("player_id", "game_id_nba", "season")) %>%
+    dplyr::left_join(period_wide,  by = c("player_id", "game_id_nba", "season")) %>%
+    dplyr::left_join(milestones,   by = c("player_id", "game_id_nba", "season")) %>%
+    dplyr::mutate(dplyr::across(dplyr::all_of(c(subtype_cols, period_cols)), ~ tidyr::replace_na(.x, 0))) %>%
+    dplyr::mutate(fouled_out = pf >= 6)
+  # elapsed_seconds_at_pf_2/3/6 are left NA when that game's pf never
+  # reached that count - a real "didn't happen", not missing data.
+
+  n_mismatch <- sum(rowSums(dplyr::select(full, dplyr::all_of(subtype_cols))) != full$pf)
+  match_rate <- round(100 * (nrow(full) - n_mismatch) / nrow(full), 2)
+  logger$log("  validation: ", match_rate, "% of player-games have pf_<type> columns summing exactly to player_game_logs$pf (",
+             n_mismatch, "/", nrow(full), " mismatched).")
+
+  write_parquet(full, cfg$path_player_foul_features)
+  logger$log("  ", cfg$path_player_foul_features, " written (", nrow(full), " player-games, ",
+             length(subtype_cols) + length(period_cols) + 3, " event/timing columns).")
+  full
+}

@@ -94,6 +94,19 @@ Both tables are validated every run against `player_game_logs`' own trusted tota
 limitation: 5 turnover types, like shot-clock violations, never name a player at all in ESPN's
 feed even though the NBA box score credits someone - not a bug), blocks at 99.6%.
 
+A third table, `player_foul_features.parquet`, adds foul detail the box score can never
+provide at all: not just *how many* fouls (subtype breakdown, same pattern as turnovers/
+blocks) but *when* - `pf_q1`..`pf_q4`/`pf_ot` (period-bucketed counts) and
+`elapsed_seconds_at_pf_2`/`_3`/`_6` (the exact game-clock moment - continuous across
+regulation and OT - a player reached that many fouls, `NA` if they never did). Which
+`type_text` values actually count toward the real 6-foul disqualification limit was decided
+empirically, not from rulebook memory: tested 3 candidate sets against
+`player_game_logs.pf` directly - base foul types + Flagrant Fouls won (96.05% exact match);
+Technical Fouls (even "double" ones) don't count and are excluded. Also caught and handled:
+`"Offensive Foul"` and `"Offensive Foul Turnover"` are the *same* real event logged as two
+separate rows (100% overlap verified) - only one is counted here to avoid double-counting,
+since the other already lives in the turnover table.
+
 ## What you get
 
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel

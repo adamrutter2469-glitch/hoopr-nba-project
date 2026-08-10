@@ -424,6 +424,42 @@ classify_column <- function(col, table_key) {
     ))
   }
 
+  m <- regmatches(col, regexec("^pf_(q[0-9]|ot)$", col))[[1]]
+  if (length(m) == 2) {
+    label <- if (m[2] == "ot") "overtime (all OT periods combined)" else paste0("quarter ", substr(m[2], 2, 2))
+    return(list(
+      description = sprintf("Personal fouls this player committed during %s of this exact game.", label),
+      logic = "Counted from play_by_play PF-eligible foul events (see PF_ELIGIBLE_TYPES in R/features_playbyplay_events.R), bucketed by period_number. Answers 'when' fouls happened - the box score only has the end-of-game total.",
+      sources = "play_by_play.period_number; play_by_play.type_text (PF-eligible types only)",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+  m <- regmatches(col, regexec("^pf_(.+)$", col))[[1]]
+  if (length(m) == 2) {
+    label <- gsub("_", " ", m[2])
+    return(list(
+      description = sprintf("Personal fouls of type '%s' this player committed in this exact game, mined from play_by_play. Counts toward the real 6-foul disqualification limit - the eligible type set (base foul types + Flagrant Fouls, excluding Technical Fouls) was chosen empirically by testing which combination best reconciles against player_game_logs.pf (96.05%% exact match), not assumed from rules alone.", label),
+      logic = "Counted from play_by_play rows where type_text is this foul subtype and this player is athlete_1 (or athlete_2 too, for Double Personal Foul - both named players are credited).",
+      sources = "play_by_play.type_text; play_by_play.athlete_id_1/2 (via espn_player_id_mapping)",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+  m <- regmatches(col, regexec("^elapsed_seconds_at_pf_([0-9])$", col))[[1]]
+  if (length(m) == 2) {
+    return(list(
+      description = sprintf("Seconds elapsed since tip-off (continuous across regulation and any OT periods) when this player picked up their %s%s personal foul this game. NA if they never reached that many fouls that game (not missing data - a real 'didn't happen').",
+                             m[2], if (m[2] == "2") "nd" else if (m[2] == "3") "rd" else "th"),
+      logic = "PF-eligible foul events ranked chronologically per player-game via compute_elapsed_seconds() (whole-game-relative in regulation, period-relative in OT - verified empirically, not assumed), then the Nth one's timestamp taken.",
+      sources = "play_by_play.period_number; play_by_play.start_game_seconds_remaining",
+      family = "raw_actual", leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"
+    ))
+  }
+  if (col == "fouled_out") {
+    return(list(description = "TRUE if this player committed 6+ PF-eligible personal fouls this game (the real disqualification threshold).",
+      logic = "pf >= 6", sources = "pf", family = "raw_actual",
+      leakage_risk = "UNSAFE - this game's actual result, never use to predict this same game"))
+  }
+
   # raw actual stat (this exact game's result)
   if (col %in% names(STAT_GLOSSARY)) {
     is_adv <- grepl("^adv_", col)
@@ -485,6 +521,9 @@ TABLES <- list(
     sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
   player_block_features = list(path = cfg$path_player_block_features, kind = "parquet",
     description = "Player-game grain block detail, mined from play_by_play (R/features_playbyplay_events.R) - one row per player per game player_game_logs has, 0s for types that didn't occur. Blocks have no dedicated type_text (a blocked shot just carries its normal shot type) - detected via a structural rule instead: a missed shot with a 2nd player attached can only be a block. Subdivided by shot category (dunk/layup/hook/tip/jump_shot). blk_* columns validated against player_game_logs.blk: 99.6% exact match. fg_blocked_* (how often a player's OWN shot gets blocked) has no official box-score equivalent to validate against - a genuinely new stat this data enables, not something the NBA box score tracks.",
+    sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
+  player_foul_features = list(path = cfg$path_player_foul_features, kind = "parquet",
+    description = "Player-game grain foul detail, mined from play_by_play (R/features_playbyplay_events.R) - one row per player per game player_game_logs has, 0s for types that didn't occur. Three views built from the same underlying events: pf_<type> (foul subtype - shooting/personal/loose ball/offensive/flagrant/etc.), pf_q1..pf_q4/pf_ot (WHEN in the game fouls happened - the box score's end-of-game total can't answer this), and elapsed_seconds_at_pf_2/3/6 (the exact game-clock moment - continuous across regulation and OT - a player reached that many fouls, NA if they never did). The PF-eligible foul type set (which type_texts count toward the real 6-foul disqualification) was chosen empirically by testing candidate sets against player_game_logs.pf directly, not assumed from rulebook memory: base foul types + Flagrant Fouls won at 96.05% exact match; Technical Fouls (even 'double' ones) do not count and are excluded. 'Offensive Foul' and 'Offensive Foul Turnover' were verified to be the SAME real event logged as two separate play_by_play rows (100% overlap) - only 'Offensive Foul' is counted here to avoid double-counting; the turnover side already lives in player_turnover_features.",
     sources = "play_by_play; espn_player_id_mapping; player_game_logs"),
   schedule_with_travel_detail = list(path = cfg$path_schedule_with_travel, kind = "parquet",
     description = "One row per game, with home_*/away_* rest and travel columns side by side.",
