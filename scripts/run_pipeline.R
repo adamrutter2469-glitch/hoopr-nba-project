@@ -16,6 +16,9 @@
 #                               data_processed/ to Cloudflare R2.
 #   --skip-bbs-mapping         Skip rebuilding the Big Balls Sports
 #                               Data id-mapping bridge tables.
+#   --skip-bbs-odds            Skip today's rebounds-prop archive
+#                               snapshot.
+#   --skip-playbyplay          Skip the play-by-play pull.
 #   None of these change config/config.R - useful for a fast
 #   verification run or a routine run when you don't want to wait on
 #   one of them.
@@ -51,6 +54,12 @@ if ("--skip-r2-sync" %in% args) {
 if ("--skip-bbs-mapping" %in% args) {
   cfg$bbs_mapping_enabled <- FALSE
 }
+if ("--skip-bbs-odds" %in% args) {
+  cfg$bbs_odds_enabled <- FALSE
+}
+if ("--skip-playbyplay" %in% args) {
+  cfg$playbyplay_enabled <- FALSE
+}
 
 logger <- init_logger(cfg$path_logs)
 on.exit(logger$close(), add = TRUE)
@@ -83,10 +92,12 @@ run_stage("BBS id mapping",       refresh_bigballsdata_mapping(cfg, logger))
 run_stage("Schedule",             refresh_schedule(cfg, logger))
 run_stage("Team game logs",       refresh_team_game_logs(cfg, logger))
 run_stage("Player game logs",     refresh_player_game_logs(cfg, logger))
+run_stage("Play-by-play",         refresh_playbyplay(cfg, logger))
 run_stage("Rest/travel features", refresh_rest_travel_features(cfg, logger))
 stage_results$team_rebounding   <- run_stage("Advanced rebounding",  refresh_rebounding_features(cfg, logger))
 stage_results$player_rebounding <- run_stage("Player rebounding",    refresh_player_rebounding_features(cfg, logger))
 run_stage("Combine features",     combine_all_features(cfg, logger))
+run_stage("BBS odds snapshot",    refresh_bigballsdata_odds(cfg, logger))
 run_stage("R2 sync",              sync_to_r2(cfg, logger))
 
 elapsed <- round(as.numeric(difftime(Sys.time(), start_time, units = "mins")), 1)

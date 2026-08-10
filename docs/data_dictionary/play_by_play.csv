@@ -1,0 +1,68 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,play_by_play,"Event-level play-by-play: one row per play (shot/foul/turnover/rebound/etc.) for every game, with shot coordinates, the players involved, and game-clock context. ESPN-sourced (hoopR::load_nba_pbp()) since the NBA-Stats-native PBP/shot-location endpoints are currently blocked on NBA's side. game_id_nba is bridged in deterministically by matching (game_date, home team abbrev, away team abbrev) against the schedule - not ESPN's native game_id (kept as game_id_espn). ~99.9% of games match; the rare miss is an All-Star/exhibition game with no NBA Stats counterpart.",NA,hoopR::load_nba_pbp(); schedule (for the game_id_nba bridge),NA,NA,NA
+2,game_play_number,"This play's ordinal position within the game (1st play, 2nd play, ...).",NA,hoopR::load_nba_pbp(),integer,context,safe
+3,id,ESPN's unique identifier for this individual play event.,NA,hoopR::load_nba_pbp(),numeric,identifier,safe
+4,sequence_number,ESPN's sequence number for this play within the game feed.,NA,hoopR::load_nba_pbp(),integer,identifier,safe
+5,type_id,ESPN's numeric code for this play's event type.,NA,hoopR::load_nba_pbp(),integer,metadata,safe (metadata only)
+6,type_text,"Event type in plain text, e.g. 'Jump Shot', 'Defensive Rebound', 'Clear Path Foul', '8-Second Turnover'. Very granular - dozens of distinct foul/turnover/shot subtypes.",NA,hoopR::load_nba_pbp(),character,context,safe
+7,text,"Full human-readable play description, e.g. 'Chet Holmgren makes 1-foot layup (Luguentz Dort assists)'.",NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+8,away_score,Away team's running score after this play.,NA,hoopR::load_nba_pbp(),integer,context,"safe (this play's own outcome, not a prediction target)"
+9,home_score,Home team's running score after this play.,NA,hoopR::load_nba_pbp(),integer,context,"safe (this play's own outcome, not a prediction target)"
+10,period_number,Quarter/period number.,NA,hoopR::load_nba_pbp(),integer,context,safe
+11,period_display_value,"Human-readable period, e.g. '1st Quarter', 'OT'.",NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+12,clock_display_value,Alias of time.,NA,hoopR::load_nba_pbp(),character,context,safe
+13,scoring_play,TRUE if this play scored points.,NA,hoopR::load_nba_pbp(),logical,context,safe
+14,score_value,"Points this play was worth (1/2/3), NA if not a scoring play.",NA,hoopR::load_nba_pbp(),integer,context,safe
+15,team_id,ESPN's own team identifier for the team involved in this play - NOT our NBA Stats team_id used elsewhere in this pipeline.,NA,hoopR::load_nba_pbp(),integer,identifier,safe
+16,athlete_id_1,ESPN's player identifier for the primary player involved in this play (e.g. the shooter) - NOT our NBA Stats player_id.,NA,hoopR::load_nba_pbp(),integer,identifier,safe
+17,athlete_id_2,"ESPN's player identifier for a secondary player involved (e.g. the assister), if any.",NA,hoopR::load_nba_pbp(),integer,identifier,safe
+18,athlete_id_3,"ESPN's player identifier for a third player involved, if any.",NA,hoopR::load_nba_pbp(),integer,identifier,safe
+19,wallclock,Real-world UTC timestamp the play was recorded.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+20,shooting_play,TRUE if this play was a shot attempt (made or missed).,NA,hoopR::load_nba_pbp(),logical,context,safe
+21,coordinate_x_raw,Shot/event x-coordinate in ESPN's raw pixel-space units.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+22,coordinate_y_raw,Shot/event y-coordinate in ESPN's raw pixel-space units.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+23,game_id_espn,ESPN's own game identifier (this data's native key before bridging to game_id_nba).,NA,hoopR::load_nba_pbp(),integer,identifier,safe
+24,season_type,'Regular Season' / 'Playoffs' / etc. for this game.,NA,hoopR::load_nba_pbp(),integer,context,safe
+25,home_team_id,ESPN's own identifier for the home team - NOT our NBA Stats team_id.,NA,hoopR::load_nba_pbp(),integer,identifier,safe
+26,home_team_name,Home team's name as ESPN spells it.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+27,home_team_mascot,Home team's mascot name.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+28,home_team_abbrev,Home team's abbreviation as ESPN spells it - differs from our home_team_tricode for 6 franchises (NY/GS/SA/UTAH/WSH/NO vs our NYK/GSW/SAS/UTA/WAS/NOP); used to build the game_id_nba bridge (see R/pull_playbyplay.R).,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+29,home_team_name_alt,Alternate/short form of the home team's name.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+30,away_team_id,ESPN's own identifier for the away team - NOT our NBA Stats team_id.,NA,hoopR::load_nba_pbp(),integer,identifier,safe
+31,away_team_name,Away team's name as ESPN spells it.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+32,away_team_mascot,Away team's mascot name.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+33,away_team_abbrev,Away team's abbreviation as ESPN spells it - same mismatch caveat as home_team_abbrev.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+34,away_team_name_alt,Alternate/short form of the away team's name.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+35,game_spread,"Betting point spread for this game, as carried by ESPN's feed - not something this pipeline pulled deliberately; unrelated to the bigballsdata odds work (R/pull_bigballsdata_odds.R). Review before relying on it (coverage/definition not verified).",NA,hoopR::load_nba_pbp(),numeric,unclassified,NA
+36,home_favorite,"Whether the home team was favored, per ESPN's feed. Same caveat as game_spread - not independently verified.",NA,hoopR::load_nba_pbp(),logical,unclassified,NA
+37,game_spread_available,Whether a spread was available for this game in ESPN's feed.,NA,hoopR::load_nba_pbp(),logical,unclassified,NA
+38,home_team_spread,"Home team's point spread, per ESPN's feed. Same caveat as game_spread.",NA,hoopR::load_nba_pbp(),numeric,unclassified,NA
+39,qtr,Quarter number (5+ = overtime period).,NA,hoopR::load_nba_pbp(),integer,context,safe
+40,time,"Game clock display at this play, e.g. '11:36'.",NA,hoopR::load_nba_pbp(),character,context,safe
+41,clock_minutes,Minutes remaining on the game clock at this play.,NA,hoopR::load_nba_pbp(),integer,context,safe
+42,clock_seconds,Seconds remaining on the game clock at this play.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+43,home_timeout_called,TRUE if the home team called a timeout on this play.,NA,hoopR::load_nba_pbp(),logical,context,safe
+44,away_timeout_called,TRUE if the away team called a timeout on this play.,NA,hoopR::load_nba_pbp(),logical,context,safe
+45,half,Half number (1 or 2).,NA,hoopR::load_nba_pbp(),integer,context,safe
+46,game_half,Alias/label of half.,NA,hoopR::load_nba_pbp(),integer,context,safe
+47,lag_qtr,Quarter number of the previous play - a lookback helper for detecting quarter transitions.,NA,hoopR::load_nba_pbp(),integer,context,safe
+48,lead_qtr,Quarter number of the next play - a lookahead helper for detecting quarter transitions.,NA,hoopR::load_nba_pbp(),integer,context,safe
+49,lag_half,Half number of the previous play.,NA,hoopR::load_nba_pbp(),integer,context,safe
+50,lead_half,Half number of the next play.,NA,hoopR::load_nba_pbp(),integer,context,safe
+51,start_quarter_seconds_remaining,Seconds remaining in the quarter at the start of this play.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+52,start_half_seconds_remaining,Seconds remaining in the half at the start of this play.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+53,start_game_seconds_remaining,Seconds remaining in the game at the start of this play.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+54,end_quarter_seconds_remaining,Seconds remaining in the quarter after this play.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+55,end_half_seconds_remaining,Seconds remaining in the half after this play.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+56,end_game_seconds_remaining,Seconds remaining in the game after this play.,NA,hoopR::load_nba_pbp(),numeric,context,safe
+57,period,Alias of qtr/period_number.,NA,hoopR::load_nba_pbp(),integer,context,safe
+58,coordinate_x,"Shot/event x-coordinate, normalized to real court units - use this (not the _raw version) for zone/distance calculations.",NA,hoopR::load_nba_pbp(),numeric,context,safe
+59,coordinate_y,"Shot/event y-coordinate, normalized to real court units - use this (not the _raw version) for zone/distance calculations.",NA,hoopR::load_nba_pbp(),numeric,context,safe
+60,game_date,Calendar date the game was/will be played.,NA,hoopR API,Date,identifier,safe
+61,game_date_time,Full game start timestamp.,NA,hoopR::load_nba_pbp(),POSIXct,metadata,safe (metadata only)
+62,athlete_name_1,Name of the primary player involved in this play.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+63,athlete_name_2,"Name of a secondary player involved, if any.",NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+64,athlete_name_3,"Name of a third player involved, if any.",NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+65,type_abbreviation,Short code for type_text.,NA,hoopR::load_nba_pbp(),character,metadata,safe (metadata only)
+66,game_id_nba,"NBA Stats API's canonical game identifier, bridged in from the schedule (not ESPN's native key).","Joined from schedule on (game_date, home team abbrev, away team abbrev) - a deterministic key, since a team plays a given opponent at most once per date. ~99.9% match rate; the rare miss is typically an All-Star/exhibition game with no NBA Stats regular-season/playoff counterpart.",schedule.game_id_nba (via date + team abbreviation match),character,identifier,safe
+67,season,"Season string, e.g. '2022-23'.","Set explicitly to the season being pulled, not trusted from the API's own inconsistently-typed season field - see R/pull_schedule.R.",NA,character,identifier,safe

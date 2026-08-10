@@ -39,6 +39,7 @@ cfg <- list(
   path_manifest       = "state/manifest.json",
 
   path_schedule_dataset    = "data_raw/schedule",              # partitioned by season
+  path_playbyplay_dataset  = "data_raw/play_by_play",           # partitioned by season
   path_team_logs_dataset   = "data_raw/team_game_logs",         # partitioned by season
   path_player_logs_dataset = "data_raw/player_game_logs",       # partitioned by season
 
@@ -145,5 +146,66 @@ cfg <- list(
   # Free tier is 100 req/min, 1000/day - this stage uses ~55 calls
   # total (1 for teams, ~54 paginated for players), well within it.
   bbs_mapping_enabled = TRUE,
-  throttle_bbs_sec    = 0.3
+
+  # 0.7s -> ~85.7 req/min, a real ~14% margin under the 100/min free-
+  # tier cap (not just barely under it) - timing jitter, real API
+  # latency between the sleep and the next call firing, and their
+  # docs' own warning about a separate 4xx "circuit breaker" penalty
+  # for repeated failures all argue for staying comfortably clear of
+  # the line rather than skimming it. Shared by both BBS stages
+  # (mapping's player pagination, the daily odds pull) since they
+  # hit the same account-level rate limit bucket. 0.3 (~200/min) was
+  # the bug that got us throttled - do not lower this back down.
+  throttle_bbs_sec = 0.7,
+
+  # ------------------------------------------------------------
+  # Daily rebounds-prop archive (R/pull_bigballsdata_odds.R)
+  # ------------------------------------------------------------
+  # bigballsdata's true historical odds endpoints require a paid
+  # plan - this is the free-tier workaround, appending one snapshot
+  # per day of TODAY's relevant players' current lines rather than
+  # buying access to theirs. No-ops cleanly on days with no games
+  # scheduled (off days, offseason).
+  bbs_odds_enabled  = TRUE,
+  path_props_history = "data_raw/player_props_history",  # partitioned by pulled_date
+
+  # ------------------------------------------------------------
+  # Player archetypes + tier (models/build_player_archetypes.R)
+  # ------------------------------------------------------------
+  # NOT wired into run_pipeline.bat - like train_rebounds_model.R, this
+  # is a user-run script (run once, re-run manually as the season's
+  # stats accumulate), not an ETL step that belongs on every incremental
+  # pull. Clusters ALL seasons' player-seasons together in one fit so
+  # archetype cluster identity stays comparable across seasons (rather
+  # than each season getting its own incompatible cluster numbering).
+  path_player_archetypes = "data_processed/player_archetypes.parquet",
+
+  # A player-season needs to clear both floors to get an archetype -
+  # keeps small-sample garbage-time cameos from producing a noisy label.
+  player_archetype_min_games   = 20,
+  player_archetype_min_minutes = 10,   # average minutes/game that season
+
+  # Number of clusters. Chosen by eye (silhouette/elbow diagnostics
+  # printed by the script) balanced against how many distinct play
+  # styles are actually nameable - not auto-selected, since the point
+  # is a small set of human-legible categories, not a "statistically
+  # optimal" k.
+  player_archetype_k = 9,
+
+  # Fixed seed for kmeans (which is randomly initialized via nstart) -
+  # without this, re-running the script mid-season would produce
+  # slightly different cluster boundaries/numbering on identical data
+  # purely from RNG, which would make "archetype_cluster" drift for
+  # reasons that have nothing to do with the underlying player data.
+  player_archetype_seed = 42,
+
+  # ------------------------------------------------------------
+  # Play-by-play (R/pull_playbyplay.R)
+  # ------------------------------------------------------------
+  # Bulk per-season pull (hoopR::load_nba_pbp(), ESPN-sourced via
+  # sportsdataverse's hosted release files) - NOT the live NBA Stats
+  # API, so no per-request throttling needed here unlike the
+  # rebounding stages. Requires the schedule to already be pulled for
+  # a season (used to build the ESPN game_id -> game_id_nba bridge).
+  playbyplay_enabled = TRUE
 )

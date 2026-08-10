@@ -46,13 +46,19 @@ target, or for post-game analysis). `NA` means unclassified - check the column y
 | [`team_game_features`](team_game_features.csv) | 9,840 x 269 | 1 row/team-game - **the main table.** Box score, rest/travel, rolling averages, opponent/matchup features. |
 | [`player_game_features`](player_game_features.csv) | 105,253 x 83 | 1 row/player-game. |
 | [`team_rebounding_features`](team_rebounding_features.csv) | 9,840 x 14 | 1 row/team-game - parsed advanced rebounding splits, this-game actuals only. |
+| [`player_rebounding_features`](player_rebounding_features.csv) | 22,818 x 18 | 1 row/player-game - player-grain analog, scoped by `cfg$player_rebounding_seasons`/`_min_minutes`. |
+| [`play_by_play`](play_by_play.csv) | 2,501,259 x 66 | 1 row/play - event-level, ESPN-sourced (`hoopR::load_nba_pbp()`); `game_id_nba` bridged in from the schedule. |
+| [`team_id_mapping`](team_id_mapping.csv) | 30 x 5 | 1 row/team - bridge to Big Balls Sports Data's team ids. |
+| [`player_id_mapping`](player_id_mapping.csv) | 4,731 x 5 | 1 row/player - bridge to Big Balls Sports Data's player ids. |
 | [`schedule_with_travel_detail`](schedule_with_travel_detail.csv) | 5,303 x 18 | 1 row/game. |
 | [`schedule_team_level_final`](schedule_team_level_final.csv) | 10,606 x 16 | 1 row/team-game. |
-| [`schedule`](schedule.csv) | 5,303 x 7 | 1 row/game - raw pull. |
+| [`schedule`](schedule.csv) | 5,303 x 10 | 1 row/game - raw pull. |
 | [`team_game_logs`](team_game_logs.csv) | 9,840 x 30 | 1 row/team-game - raw pull. |
 | [`player_game_logs`](player_game_logs.csv) | 105,253 x 33 | 1 row/player-game - raw pull. |
 | [`players_raw`](players_raw.csv) | 5,205 x 42 | 1 row/player - reference data. Several `.x`/`.y`-suffixed columns from hoopR's own internal join are genuinely ambiguous and flagged `NEEDS REVIEW` rather than guessed at. |
 | [`teams_raw`](teams_raw.csv) | 30 x 36 | 1 row/team - reference data. |
 
 Row/col counts as of the run that generated these files - re-run the script and they'll
-update automatically as the pipeline pulls more games.
+update automatically as the pipeline pulls more games. This table listing itself is
+hand-maintained (not auto-generated like the CSVs) - update it here when a table is
+added/removed.

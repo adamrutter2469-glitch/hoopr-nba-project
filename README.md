@@ -14,9 +14,9 @@ run_pipeline.bat                        # pulls anything new and rebuilds the fe
 ```
 
 `run_pipeline.bat` is safe to run as often as you like (daily, after every night's games, etc.) -
-everything is incremental. Pass `--skip-rebounding`, `--skip-player-rebounding`, and/or
-`--skip-r2-sync` to skip any of the slower/optional stages for a single run:
-`run_pipeline.bat --skip-rebounding`.
+everything is incremental. Pass `--skip-rebounding`, `--skip-player-rebounding`,
+`--skip-r2-sync`, `--skip-bbs-mapping`, `--skip-bbs-odds`, and/or `--skip-playbyplay` to skip any
+of the slower/optional stages for a single run: `run_pipeline.bat --skip-rebounding`.
 
 ### Cloud backup (Cloudflare R2)
 
@@ -43,6 +43,24 @@ NBA-Stats-sourced ids. Neither source shares a key with ours (their ids are UUID
 abbreviations differ from NBA.com's tricode for 5 franchises), so both are matched by normalized
 name rather than id, with same-name collisions on either side excluded rather than guessed at.
 Requires `BBS_API_KEY` in `.env` - skips itself if it's not set, same as the R2 sync.
+
+### Play-by-play
+
+`R/pull_playbyplay.R` pulls event-level play-by-play (every shot/foul/turnover/rebound, with
+shot coordinates, the players involved, and game-clock context) via `hoopR::load_nba_pbp()` - a
+bulk per-season download from sportsdataverse's own hosted release files, not the live NBA Stats
+API. It's the practical choice right now: the NBA-Stats-native PBP and shot-location endpoints
+(`nba_pbp()`, `nba_data_pbp()`, `nba_leaguedashplayershotlocations()`, `nba_shotchartdetail()`)
+are all currently returning errors/blocked on NBA's side.
+
+This data is ESPN-sourced, so it carries ESPN's own `game_id` and team abbreviations, not this
+project's `game_id_nba`. `game_id_nba` is bridged in deterministically by matching
+`(game_date, home team abbrev, away team abbrev)` against the schedule - a team plays a given
+opponent at most once per date, so this key is unambiguous (no fuzzy matching needed, unlike the
+bigballsdata bridge tables above). ~99.9% of games match; the rare miss is typically an
+All-Star/exhibition game with no NBA Stats regular-season/playoff counterpart. ESPN's team
+abbreviations differ from NBA.com's tricode for 6 franchises (`NY`/`GS`/`SA`/`UTAH`/`WSH`/`NO`
+vs. our `NYK`/`GSW`/`SAS`/`UTA`/`WAS`/`NOP`) - see `ESPN_ABBREV_FIX` in `R/pull_playbyplay.R`.
 
 ## What you get
 
@@ -75,6 +93,7 @@ data_raw/
   schedule/                season-partitioned parquet dataset (season=2022-23/part-0.parquet, ...)
   team_game_logs/          season-partitioned parquet dataset
   player_game_logs/        season-partitioned parquet dataset
+  play_by_play/            season-partitioned parquet dataset - event-level, ESPN-sourced (see above)
   players_raw.parquet, teams_raw.parquet     single files, fully refreshed each run
   team_rebounding_dashboards.rds             raw nested API cache - stays RDS, see below
   player_rebounding_dashboards.rds           same, player grain - scoped down by default,
@@ -127,6 +146,10 @@ keeps changing) - each pulled season is deduped and written to just its own part
 travel and rolling-average features are cheap local recomputes; advanced rebounding (both
 `R/pull_rebounding.R` at team grain and `R/pull_player_rebounding.R` at player grain) only
 pulls game pairs it doesn't already have, since that's the one stage with no bulk API endpoint.
+Play-by-play (`R/pull_playbyplay.R`) is a bulk per-season pull like the schedule/game logs - same
+"pull any season not yet loaded, always re-pull the current season" pattern, and fast (seconds
+per season, not the hours the per-game rebounding pulls take) since it isn't throttled against a
+rate-limited API.
 
 On any key collision during a re-pull, the freshly-pulled row always wins over whatever was
 cached (see `combine_and_dedupe()` in `R/utils_io.R`) - so a stat correction the API issues

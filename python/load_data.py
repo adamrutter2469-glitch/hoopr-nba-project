@@ -78,6 +78,30 @@ def load_player_game_logs() -> pd.DataFrame:
     return _read(DATA_RAW / "player_game_logs")
 
 
+def load_playbyplay(season: str = None, game_id_nba: str = None) -> pd.DataFrame:
+    """Event-level play-by-play - ESPN-sourced (hoopR::load_nba_pbp()), with
+    game_id_nba bridged in from the schedule (see R/pull_playbyplay.R and
+    docs/data_dictionary/play_by_play.csv for the full column list).
+
+    2.5M+ rows across all seasons - pass `season` (e.g. "2023-24") and/or
+    `game_id_nba` unless you actually want everything in memory at once.
+    Filters are pushed down at read time: `season` prunes whole partition
+    files (cheap), `game_id_nba` is a normal row filter.
+    """
+    path = DATA_RAW / "play_by_play"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found - run run_pipeline.bat from the project "
+            f"root first to build the data."
+        )
+    filters = []
+    if season is not None:
+        filters.append(("season", "==", season))
+    if game_id_nba is not None:
+        filters.append(("game_id_nba", "==", game_id_nba))
+    return pd.read_parquet(path, filters=filters or None)
+
+
 def load_players() -> pd.DataFrame:
     return _read(DATA_RAW / "players_raw.parquet")
 

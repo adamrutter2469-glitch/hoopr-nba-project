@@ -59,6 +59,7 @@ first if `data_processed/` is empty.
 | `load_team_rebounding_features()` | `data_processed/team_rebounding_features.parquet` | 1 row/team-game - parsed advanced rebounding splits on their own (already joined into the table above with an `adv_` prefix). |
 | `load_schedule_with_travel()` | `data_processed/schedule_with_travel_detail.parquet` | 1 row/game. |
 | `load_schedule()`, `load_team_game_logs()`, `load_player_game_logs()`, `load_players()`, `load_teams()` | `data_raw/*` | the pipeline's own raw input cache - usually you want the processed tables above instead. |
+| `load_playbyplay(season=None, game_id_nba=None)` | `data_raw/play_by_play/` | 1 row/play - event-level, ESPN-sourced. 2.5M+ rows total - pass `season` and/or `game_id_nba` to filter (pushed down at read time) unless you want everything at once. `game_id_nba` is bridged in from the schedule; ESPN's own game id is kept as `game_id_espn`. |
 
 Column-name reference for `team_game_features` (see the main repo
 README for how these are built): `<stat>_rollN` = this team's own

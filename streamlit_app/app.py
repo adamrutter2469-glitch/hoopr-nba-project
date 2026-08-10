@@ -36,13 +36,19 @@ def get_connection() -> duckdb.DuckDBPyConnection:
     return con
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def load_teams() -> pd.DataFrame:
-    """Cached for an hour - team reference data barely changes, no
-    reason to re-fetch from R2 on every rerun. To pull any other
-    table in the bucket, swap the read_parquet() path below - same
-    pattern works for data_processed/team_game_features.parquet,
-    the eventual analysis-layer tables, etc."""
+    """Cached for 5 minutes, not longer - team reference data itself
+    barely changes, but this TTL is the one every future page/table
+    in this app inherits by copying this pattern, and some of those
+    (odds snapshots, daily-refreshed predictions) genuinely need to
+    look fresh soon after a scheduled pipeline run lands new data in
+    R2. A long TTL trades that freshness for fewer R2 reads - not a
+    trade worth making here, since R2 reads cost effectively nothing
+    at this data's size. To pull any other table in the bucket, swap
+    the read_parquet() path below - same pattern works for
+    data_processed/team_game_features.parquet, the eventual
+    analysis-layer tables, etc."""
     con = get_connection()
     bucket = st.secrets["r2"]["bucket"]
     return con.sql(f"""

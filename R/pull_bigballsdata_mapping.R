@@ -40,12 +40,22 @@ normalize_name <- function(x) {
 # ------------------------------------------------------------
 # Authenticated GET against the BBS gateway. Returns the parsed body
 # with $data already simplified to a data frame where possible.
+#
+# req_retry() is belt-and-suspenders on top of cfg$throttle_bbs_sec
+# pacing every call site already does between requests: httr2's
+# default is_transient already treats 429/503 as retryable, and it
+# reads the response's Retry-After header (BBS's docs confirm they
+# send one on a quota 429) to time the wait itself rather than
+# guessing. The throttle is what should keep us under the limit in
+# the first place - this is only a safety net for the odd case where
+# it doesn't (e.g. other traffic on the same key from elsewhere).
 # ------------------------------------------------------------
 bbs_get <- function(path, query = list()) {
   key <- Sys.getenv("BBS_API_KEY")
   req <- httr2::request(paste0(BBS_BASE_URL, path)) %>%
     httr2::req_headers(Authorization = paste("Bearer", key)) %>%
-    httr2::req_url_query(!!!query)
+    httr2::req_url_query(!!!query) %>%
+    httr2::req_retry(max_tries = 4)
   resp <- httr2::req_perform(req)
   httr2::resp_body_json(resp, simplifyVector = TRUE)
 }

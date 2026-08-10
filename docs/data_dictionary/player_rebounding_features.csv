@@ -1,0 +1,20 @@
+row_num,name,description,logic,sources,dtype,feature_family,leakage_risk
+1,player_rebounding_features,"Parsed advanced (shot-distance / contested) rebounding splits, one row per player per game. Player-grain analog of team_rebounding_features, plus a bonus shot-distance-of-miss split not available at the team level. Scoped by cfg$player_rebounding_seasons and cfg$player_rebounding_min_minutes (see config/config.R) - not necessarily every player-game like the other tables.",NA,hoopR::nba_playerdashptreb() via data_raw/player_rebounding_dashboards.rds,NA,NA,NA
+2,player_id,Player's NBA Stats API identifier.,NA,hoopR API,character,identifier,safe
+3,game_id_nba,NBA Stats API's canonical game identifier.,NA,hoopR API,character,identifier,safe
+4,oreb,Actual offensive rebounds (tracking data) recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+5,dreb,Actual defensive rebounds (tracking data) recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+6,reb,Actual total rebounds (tracking data) recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+7,c_oreb,Actual contested offensive rebounds recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+8,c_dreb,Actual contested defensive rebounds recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+9,c_reb,Actual contested total rebounds recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+10,reb_2pt_miss,Actual rebounds off a missed 2-point shot recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+11,reb_3pt_miss,Actual rebounds off a missed 3-point shot recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+12,reb_0_3,Actual rebounds grabbed 0-3 feet from the basket recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+13,reb_3_6,Actual rebounds grabbed 3-6 feet from the basket recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+14,reb_6_10,Actual rebounds grabbed 6-10 feet from the basket recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+15,reb_10_plus,Actual rebounds grabbed 10+ feet from the basket recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+16,reb_shot_0_6,Actual rebounds off a shot missed 0-6 feet out recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+17,reb_shot_7_13,Actual rebounds off a shot missed 7-13 feet out recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+18,reb_shot_13_19,Actual rebounds off a shot missed 13-19 feet out recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
+19,reb_shot_19_plus,Actual rebounds off a shot missed 19+ feet out recorded in this exact game.,NA,hoopR::nba_playerdashptreb(),numeric,raw_actual,"UNSAFE - this game's actual result, never use to predict this same game"
