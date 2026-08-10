@@ -43,8 +43,8 @@ target, or for post-game analysis). `NA` means unclassified - check the column y
 
 | Table | Rows x cols | Grain |
 |---|---|---|
-| [`team_game_features`](team_game_features.csv) | 9,840 x 269 | 1 row/team-game - **the main table.** Box score, rest/travel, rolling averages, opponent/matchup features. |
-| [`player_game_features`](player_game_features.csv) | 105,253 x 83 | 1 row/player-game. |
+| [`team_game_features`](team_game_features.csv) | 9,840 x 278 | 1 row/team-game - **the main table.** Box score, rest/travel, rolling averages, opponent/matchup features. |
+| [`player_game_features`](player_game_features.csv) | 105,253 x 92 | 1 row/player-game. |
 | [`team_rebounding_features`](team_rebounding_features.csv) | 9,840 x 14 | 1 row/team-game - parsed advanced rebounding splits, this-game actuals only. |
 | [`player_rebounding_features`](player_rebounding_features.csv) | 22,818 x 18 | 1 row/player-game - player-grain analog, scoped by `cfg$player_rebounding_seasons`/`_min_minutes`. |
 | [`play_by_play`](play_by_play.csv) | 2,501,259 x 66 | 1 row/play - event-level, ESPN-sourced (`hoopR::load_nba_pbp()`); `game_id_nba` bridged in from the schedule. |

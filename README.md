@@ -112,7 +112,7 @@ since the other already lives in the turnover table.
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel
   context, trailing 5/10/20-game rolling averages, opponent/matchup features (what the opponent's
   own rolling form looks like, what each team typically allows, explicit comparison columns), and
-  (if enabled) advanced rebounding splits. 269 columns - see `python/README.md` for the naming
+  (if enabled) advanced rebounding splits. 278 columns - see `python/README.md` for the naming
   convention (`_rollN` / `opp_*` / `*_allowed` / `*_matchup_edge`).
 - `data_processed/player_game_features.parquet` - one row per player per game: box score, trailing
   rolling averages, and their team's rest/travel context for that game.

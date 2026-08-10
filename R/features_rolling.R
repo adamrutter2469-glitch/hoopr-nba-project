@@ -57,7 +57,8 @@ add_rolling_stats <- function(df, group_cols, date_col, stat_cols, windows) {
 # (team and player) - intersected against what's actually on disk
 # so a schema hiccup upstream degrades gracefully instead of erroring.
 ROLLING_STAT_CANDIDATES <- c("pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov",
-                              "plus_minus", "fg_pct", "fg3_pct", "ft_pct", "min")
+                              "plus_minus", "fg_pct", "fg3_pct", "ft_pct", "min",
+                              "fta", "ftm", "pf")
 
 compute_team_rolling_features <- function(team_logs, windows) {
   stat_cols <- intersect(ROLLING_STAT_CANDIDATES, names(team_logs))

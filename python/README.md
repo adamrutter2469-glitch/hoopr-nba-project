@@ -54,7 +54,7 @@ first if `data_processed/` is empty.
 
 | Function | File | Grain |
 |---|---|---|
-| `load_team_game_features()` | `data_processed/team_game_features.parquet` | 1 row/team-game - **start here.** Box score, rest/travel, rolling averages, opponent/matchup features, advanced rebounding. 269 columns. |
+| `load_team_game_features()` | `data_processed/team_game_features.parquet` | 1 row/team-game - **start here.** Box score, rest/travel, rolling averages, opponent/matchup features, advanced rebounding. 278 columns. |
 | `load_player_game_features()` | `data_processed/player_game_features.parquet` | 1 row/player-game - box score + rolling averages. |
 | `load_team_rebounding_features()` | `data_processed/team_rebounding_features.parquet` | 1 row/team-game - parsed advanced rebounding splits on their own (already joined into the table above with an `adv_` prefix). |
 | `load_schedule_with_travel()` | `data_processed/schedule_with_travel_detail.parquet` | 1 row/game. |
