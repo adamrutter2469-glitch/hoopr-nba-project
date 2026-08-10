@@ -189,18 +189,10 @@ build_espn_player_id_mapping <- function(cfg, logger) {
   }
   our_players <- our_players %>% dplyr::mutate(match_key = normalize_name(display_first_last))
 
-  our_dupe_keys  <- our_players  %>% dplyr::count(match_key) %>% dplyr::filter(n > 1) %>% dplyr::pull(match_key)
-  espn_dupe_keys <- espn_players %>% dplyr::count(match_key) %>% dplyr::filter(n > 1) %>% dplyr::pull(match_key)
-  ambiguous_keys <- union(our_dupe_keys, espn_dupe_keys)
+  matched <- match_names_two_tier(our_players, espn_players)
 
-  our_safe  <- our_players  %>% dplyr::filter(!match_key %in% ambiguous_keys)
-  espn_safe <- espn_players %>% dplyr::filter(!match_key %in% ambiguous_keys)
-
-  matched <- dplyr::inner_join(our_safe, espn_safe, by = "match_key")
-
-  n_ambiguous      <- length(ambiguous_keys)
-  n_our_unmatched  <- nrow(our_safe) - nrow(matched)
-  n_espn_unmatched <- nrow(espn_safe) - nrow(matched)
+  n_our_unmatched  <- nrow(our_players)  - nrow(matched)
+  n_espn_unmatched <- nrow(espn_players) - nrow(matched)
 
   mapping <- matched %>%
     dplyr::transmute(
@@ -212,7 +204,6 @@ build_espn_player_id_mapping <- function(cfg, logger) {
 
   write_parquet(mapping, cfg$path_espn_player_id_mapping)
   logger$log("  ", cfg$path_espn_player_id_mapping, " written (", nrow(mapping), " players matched, ",
-             n_ambiguous, " ambiguous name(s) excluded, ",
              n_our_unmatched, " of ours unmatched, ", n_espn_unmatched, " of ESPN's unmatched)")
   mapping
 }

@@ -37,6 +37,61 @@ normalize_name <- function(x) {
   x
 }
 
+# Drop a trailing generational suffix (Jr/Sr/II/III/IV) from an
+# already-normalized name. NOT folded into normalize_name() itself -
+# tried that first, and it made things worse empirically: our own
+# players_raw has "Bobby Portis Jr." while ESPN's play_by_play spells
+# the same person "Bobby Portis" (no suffix), so blanket suffix-
+# stripping does fix real cases like his - but it ALSO collides some
+# current suffixed players against a DIFFERENT, older same-named
+# player elsewhere in the full historical roster (players_raw spans
+# decades), creating brand new ambiguous exclusions. Tested: matched
+# players_raw ESPN players dropped 870->863 and ambiguous exclusions
+# rose 39->51 when suffix-stripping was applied to every name up
+# front. The fix that actually helps: try the ordinary exact
+# normalized match FIRST (matches_by_name() below), and only retry
+# with the suffix stripped for names that are STILL unmatched after
+# that - so already-correct matches are never disturbed, and only
+# genuinely stuck cases (like Portis) get the second, more aggressive
+# pass.
+# ------------------------------------------------------------
+strip_name_suffix <- function(x) {
+  gsub("[[:space:]]+(jr|sr|ii|iii|iv)$", "", x)
+}
+
+# ------------------------------------------------------------
+# Two-tier name matching: exact normalized match first, then a
+# suffix-stripped retry restricted to whatever's left unmatched on
+# BOTH sides after tier 1. Ambiguous collisions (a key matching more
+# than one person) are excluded at EACH tier independently - a name
+# ambiguous only after suffix-stripping doesn't retroactively poison
+# a tier-1 match that already succeeded cleanly.
+#
+# `ours`/`theirs` must each have a `match_key` column already set via
+# normalize_name(). `id_col_ours`/`id_col_theirs` name the columns to
+# carry through unchanged (everything else comes along via the join).
+# ------------------------------------------------------------
+match_names_two_tier <- function(ours, theirs) {
+  exclude_ambiguous <- function(df) {
+    dupes <- df %>% dplyr::count(match_key) %>% dplyr::filter(n > 1) %>% dplyr::pull(match_key)
+    df %>% dplyr::filter(!match_key %in% dupes)
+  }
+
+  ours_safe   <- exclude_ambiguous(ours)
+  theirs_safe <- exclude_ambiguous(theirs)
+  tier1 <- dplyr::inner_join(ours_safe, theirs_safe, by = "match_key")
+
+  ours_left   <- ours   %>% dplyr::filter(!match_key %in% tier1$match_key) %>%
+    dplyr::mutate(match_key = strip_name_suffix(match_key))
+  theirs_left <- theirs %>% dplyr::filter(!match_key %in% tier1$match_key) %>%
+    dplyr::mutate(match_key = strip_name_suffix(match_key))
+  ours_left_safe   <- exclude_ambiguous(ours_left)
+  theirs_left_safe <- exclude_ambiguous(theirs_left)
+  tier2 <- dplyr::inner_join(ours_left_safe, theirs_left_safe, by = "match_key")
+
+  dplyr::bind_rows(tier1, tier2)
+}
+
 # ------------------------------------------------------------
 # Authenticated GET against the BBS gateway. Returns the parsed body
 # with $data already simplified to a data frame where possible.
@@ -146,18 +201,10 @@ build_player_mapping <- function(cfg, logger) {
   }
   our_players <- our_players %>% dplyr::mutate(match_key = normalize_name(display_first_last))
 
-  our_dupe_keys <- our_players %>% dplyr::count(match_key) %>% dplyr::filter(n > 1) %>% dplyr::pull(match_key)
-  bbs_dupe_keys <- bbs_players %>% dplyr::count(match_key) %>% dplyr::filter(n > 1) %>% dplyr::pull(match_key)
-  ambiguous_keys <- union(our_dupe_keys, bbs_dupe_keys)
+  matched <- match_names_two_tier(our_players, bbs_players)
 
-  our_safe <- our_players %>% dplyr::filter(!match_key %in% ambiguous_keys)
-  bbs_safe <- bbs_players %>% dplyr::filter(!match_key %in% ambiguous_keys)
-
-  matched <- dplyr::inner_join(our_safe, bbs_safe, by = "match_key")
-
-  n_ambiguous     <- length(ambiguous_keys)
-  n_our_unmatched <- nrow(our_safe) - nrow(matched)
-  n_bbs_unmatched <- nrow(bbs_safe) - nrow(matched)
+  n_our_unmatched <- nrow(our_players) - nrow(matched)
+  n_bbs_unmatched <- nrow(bbs_players) - nrow(matched)
 
   mapping <- matched %>%
     dplyr::transmute(
@@ -170,7 +217,6 @@ build_player_mapping <- function(cfg, logger) {
 
   write_parquet(mapping, cfg$path_player_id_mapping)
   logger$log("  ", cfg$path_player_id_mapping, " written (", nrow(mapping), " players matched, ",
-             n_ambiguous, " ambiguous name(s) excluded, ",
              n_our_unmatched, " of ours unmatched, ", n_bbs_unmatched, " of theirs unmatched)")
   mapping
 }

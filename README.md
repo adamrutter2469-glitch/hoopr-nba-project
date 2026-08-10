@@ -70,6 +70,21 @@ excluded rather than guessed at - into `data_processed/espn_player_id_mapping.pa
 building: zero name collisions at any grain (team+game, team+season, or fully global) within
 this project's season scope, though the exclusion logic stays in as a safety net regardless.
 
+Both name bridges (`match_names_two_tier()` in `R/pull_bigballsdata_mapping.R`, shared by the
+ESPN and bigballsdata mappings) do matching in **two passes**: an exact normalized match first,
+then a second pass - restricted to whatever's still unmatched on both sides - with a trailing
+generational suffix (Jr./Sr./II/III/IV) stripped. This exists because of a real bug found
+empirically: our own player reference data has "Bobby Portis Jr." while ESPN's play-by-play
+feed spells the same person "Bobby Portis" (no suffix), so he was silently excluded entirely,
+not flagged ambiguous - he just never matched (86 of our players carry a suffix, not a one-off).
+Stripping suffixes on EVERY name up front was tried first and made things worse - it collided
+some current suffixed players against a different, older same-named player elsewhere in the
+full historical roster, actually reducing total matches (870->863) and raising ambiguous
+exclusions (39->51). Restricting the suffix-stripped retry to only the leftover unmatched pool
+fixed Portis-style cases without disturbing anything that already matched correctly - net
+improvement across every downstream table (e.g. turnover match rate 92.83%->93.00%, shot zone
+FGA match rate 97.99%->98.33%).
+
 ### Play-by-play event mining
 
 `R/features_playbyplay_events.R` mines play_by_play's `type_text` + athlete roles into
@@ -90,9 +105,9 @@ structural rule instead - a missed shot with a 2nd player attached can only be a
 assists only ever attach to made shots.
 
 Both tables are validated every run against `player_game_logs`' own trusted totals
-(`tov`/`blk`) - turnovers land at 92.83% exact match (the gap is a real, structural ESPN
+(`tov`/`blk`) - turnovers land at 93.00% exact match (the gap is a real, structural ESPN
 limitation: 5 turnover types, like shot-clock violations, never name a player at all in ESPN's
-feed even though the NBA box score credits someone - not a bug), blocks at 99.6%.
+feed even though the NBA box score credits someone - not a bug), blocks at 99.68%.
 
 A third table, `player_foul_features.parquet`, adds foul detail the box score can never
 provide at all: not just *how many* fouls (subtype breakdown, same pattern as turnovers/
@@ -101,7 +116,7 @@ blocks) but *when* - `pf_q1`..`pf_q4`/`pf_ot` (period-bucketed counts) and
 regulation and OT - a player reached that many fouls, `NA` if they never did). Which
 `type_text` values actually count toward the real 6-foul disqualification limit was decided
 empirically, not from rulebook memory: tested 3 candidate sets against
-`player_game_logs.pf` directly - base foul types + Flagrant Fouls won (96.05% exact match);
+`player_game_logs.pf` directly - base foul types + Flagrant Fouls won (96.31% exact match);
 Technical Fouls (even "double" ones) don't count and are excluded. Also caught and handled:
 `"Offensive Foul"` and `"Offensive Foul Turnover"` are the *same* real event logged as two
 separate rows (100% overlap verified) - only one is counted here to avoid double-counting,
@@ -118,7 +133,7 @@ from center court), and the 2PT/3PT boundary was checked against actual recorded
 before trusting it for anything (99.966% match). One real bug caught before it corrupted
 anything: `shooting_play == TRUE` also includes free throws, which aren't field goal attempts
 and don't reflect real shot-selection location - excluding them was what took the zone-total
-validation from 44% match to 97.99%/99.4% (FGA/FGM).
+validation from 44% match to 98.33%/99.73% (FGA/FGM).
 
 ## What you get
 
