@@ -300,6 +300,63 @@ compute_elapsed_seconds <- function(period_number, start_game_seconds_remaining)
 }
 
 # ------------------------------------------------------------
+# Per player-game: elapsed game-clock seconds at the moment a player
+# FIRST checked into the game - the anchor needed to turn a game-
+# clock-relative stat (like elapsed_seconds_at_pf_2 below) into a
+# playing-time-relative one, e.g. "did their 2nd foul come within
+# their first 10 minutes ON THE FLOOR" instead of "within the game's
+# first 10 minutes" (which unfairly flatters/penalizes bench players
+# who simply weren't out there yet - see conversation history).
+#
+# Uses "Substitution" events (text is always "X enters the game for
+# Y" - athlete_id_1 = entering, athlete_id_2 = leaving). Rule, applied
+# per player per game, using their EARLIEST substitution appearance
+# (as either role):
+#   - earliest appearance is an ENTRY  -> checkin = that event's time
+#     (a bench player checking in mid-game)
+#   - earliest appearance is an EXIT   -> checkin = 0
+#     (they were already on the floor when subbed out, i.e. a starter)
+#   - no substitution appearance at all -> checkin = 0
+#     (played the whole game with zero substitutions either way - an
+#     iron-man starter; also covers true DNPs, harmlessly, since a
+#     player who never played has no foul data downstream anyway)
+# The last case is handled by the caller defaulting a left-join miss
+# to 0, not inside this function - this function only returns rows
+# for players with at least one substitution event.
+# ------------------------------------------------------------
+build_player_game_checkin_time <- function(cfg, logger) {
+  pbp <- read_full_dataset(cfg$path_playbyplay_dataset)
+  if (is.null(pbp)) {
+    logger$log("Player check-in time: SKIPPED, no play_by_play data yet.")
+    return(invisible(NULL))
+  }
+  espn_map <- read_parquet_or_null(cfg$path_espn_player_id_mapping)
+  if (is.null(espn_map)) {
+    logger$log("Player check-in time: SKIPPED, no espn_player_id_mapping.parquet yet.")
+    return(invisible(NULL))
+  }
+
+  subs <- pbp %>%
+    dplyr::filter(gsub("\n", " ", type_text) == "Substitution") %>%
+    dplyr::mutate(elapsed_seconds = compute_elapsed_seconds(period_number, start_game_seconds_remaining))
+
+  enters <- subs %>% dplyr::filter(!is.na(athlete_id_1)) %>%
+    dplyr::transmute(athlete_id_espn = as.character(athlete_id_1), game_id_nba, elapsed_seconds, role = "enter")
+  exits <- subs %>% dplyr::filter(!is.na(athlete_id_2)) %>%
+    dplyr::transmute(athlete_id_espn = as.character(athlete_id_2), game_id_nba, elapsed_seconds, role = "exit")
+
+  first_appearance <- dplyr::bind_rows(enters, exits) %>%
+    dplyr::inner_join(espn_map %>% dplyr::select(athlete_id_espn, player_id), by = "athlete_id_espn") %>%
+    dplyr::group_by(player_id, game_id_nba) %>%
+    dplyr::slice_min(elapsed_seconds, n = 1, with_ties = FALSE) %>%
+    dplyr::ungroup()
+
+  first_appearance %>%
+    dplyr::transmute(player_id, game_id_nba,
+                      checkin_elapsed_seconds = dplyr::if_else(role == "enter", elapsed_seconds, 0))
+}
+
+# ------------------------------------------------------------
 # Shared long-format base: one row per player per PF-eligible foul
 # event, with the subtype key, period bucket, and elapsed-seconds
 # timestamp all attached - every downstream view (subtype counts,
@@ -381,6 +438,8 @@ refresh_foul_features <- function(cfg, logger) {
   logs <- read_full_dataset(cfg$path_player_logs_dataset) %>%
     dplyr::select(player_id, game_id_nba, season, pf)
 
+  checkin <- build_player_game_checkin_time(cfg, logger)
+
   subtype_cols <- setdiff(names(subtype_wide), c("player_id", "game_id_nba", "season"))
   period_cols  <- setdiff(names(period_wide),  c("player_id", "game_id_nba", "season"))
 
@@ -392,6 +451,26 @@ refresh_foul_features <- function(cfg, logger) {
     dplyr::mutate(fouled_out = pf >= 6)
   # elapsed_seconds_at_pf_2/3/6 are left NA when that game's pf never
   # reached that count - a real "didn't happen", not missing data.
+
+  # On-court-time-relative versions of the same milestones - checkin
+  # time missing (player never appeared in a substitution event that
+  # game) defaults to 0 (played the whole game with no subs at all -
+  # see build_player_game_checkin_time() header comment). Left NA
+  # whenever the game-clock version is already NA (foul count never
+  # reached that game) - subtracting a valid checkin time from NA
+  # stays NA automatically, no explicit guard needed.
+  if (!is.null(checkin)) {
+    full <- full %>%
+      dplyr::left_join(checkin, by = c("player_id", "game_id_nba")) %>%
+      dplyr::mutate(checkin_elapsed_seconds = tidyr::replace_na(checkin_elapsed_seconds, 0)) %>%
+      dplyr::mutate(
+        onct_elapsed_at_pf_2 = pmax(elapsed_seconds_at_pf_2 - checkin_elapsed_seconds, 0),
+        onct_elapsed_at_pf_3 = pmax(elapsed_seconds_at_pf_3 - checkin_elapsed_seconds, 0),
+        onct_elapsed_at_pf_6 = pmax(elapsed_seconds_at_pf_6 - checkin_elapsed_seconds, 0)
+      )
+  } else {
+    logger$log("  Check-in time unavailable - onct_elapsed_at_pf_* columns not added.")
+  }
 
   n_mismatch <- sum(rowSums(dplyr::select(full, dplyr::all_of(subtype_cols))) != full$pf)
   match_rate <- round(100 * (nrow(full) - n_mismatch) / nrow(full), 2)

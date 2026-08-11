@@ -185,6 +185,7 @@ cfg <- list(
   # than each season getting its own incompatible cluster numbering).
   path_player_archetypes = "data_processed/player_archetypes.parquet",
   path_player_offensive_archetypes = "data_processed/player_offensive_archetypes.parquet",
+  path_player_defensive_archetypes = "data_processed/player_defensive_archetypes.parquet",
 
   # A player-season needs to clear both floors to get an archetype -
   # keeps small-sample garbage-time cameos from producing a noisy label.
@@ -202,6 +203,28 @@ cfg <- list(
 
   # k for the offense-only system (models/build_offensive_archetypes.R).
   player_archetype_offense_k = 9,
+
+  # k for the defense/hustle-only system (models/build_defensive_archetypes.R).
+  # Chosen by reviewing k against a full k=3..15 silhouette sweep (not
+  # elbow/withinss, which can't itself pick a k) - the silhouette-
+  # optimal k=3 collapsed to a size/position proxy (bigs/wings/guards)
+  # rather than the steal-type/block-type/foul-timing distinctions the
+  # feature set was built to capture, so k=9 was chosen instead for
+  # basketball legibility, same judgment call as player_archetype_
+  # offense_k. NOTE: this value isn't actually read by the build
+  # script - it hardcodes FORCE_K = 9 directly (see that script's
+  # header) since the sweep itself needs to run inside the script, not
+  # just the final k. Kept here for documentation/consistency with the
+  # other two archetype systems' k config entries.
+  player_archetype_defense_k = 9,
+
+  # "Early foul trouble" window for the defensive archetype system, in
+  # ON-COURT minutes played (not game-clock minutes) - see
+  # onct_elapsed_at_pf_2/3/6 in player_foul_features and
+  # checkin_elapsed_seconds's header comment in
+  # R/features_playbyplay_events.R for why this is anchored to a
+  # player's own check-in time rather than the raw game clock.
+  foul_trouble_window_minutes = 10,
 
   # Fixed seed for kmeans (which is randomly initialized via nstart) -
   # without this, re-running the script mid-season would produce

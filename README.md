@@ -122,6 +122,12 @@ Technical Fouls (even "double" ones) don't count and are excluded. Also caught a
 separate rows (100% overlap verified) - only one is counted here to avoid double-counting,
 since the other already lives in the turnover table.
 
+`player_foul_features` also carries `checkin_elapsed_seconds` and `onct_elapsed_at_pf_2/3/6` -
+the same foul-timing milestones re-anchored to a player's own on-court playing time instead of
+the raw game clock, reconstructed from `play_by_play` substitution events
+(`build_player_game_checkin_time()`). See "Player archetypes" below for why this exists (a
+game-clock-relative foul-timing feature was silently penalizing bench players).
+
 A fourth table, `player_shot_zone_features.parquet` (`R/features_shot_zones.R`), classifies
 every shot attempt into one of 8 court zones (restricted area, paint non-RA, left/center/right
 mid-range, left/right corner 3, above-the-break 3) from `coordinate_x`/`coordinate_y` -
@@ -137,7 +143,7 @@ validation from 44% match to 98.33%/99.73% (FGA/FGM).
 
 ### Player archetypes
 
-Two separate k-means clustering systems (both `models/`, user-run, not wired into
+Three separate k-means clustering systems (all `models/`, user-run, not wired into
 `run_pipeline.bat` - retraining isn't an ETL step) classify each player-season into a text
 play-style archetype, one row per player-season (min 20 games, min 10 min/game that season):
 
@@ -160,9 +166,42 @@ play-style archetype, one row per player-season (min 20 games, min 10 min/game t
   scorer" and the extreme-alley-oop-rate "lob threat" group) into one, losing the cleanest,
   most interesting finding the richer feature set produced - confirmed empirically, not
   assumed, that 9 was the better fit.
+- **`player_defensive_archetypes.parquet`** (`models/build_defensive_archetypes.R`) -
+  defense/hustle-only (no scoring stats at all), **2025-26 season only** - not all 4 seasons
+  like the other two systems, because it depends on `player_rebounding_features`, which is
+  currently only pulled for `cfg$player_rebounding_seasons`. Feature set: steal type (lost-
+  ball/on-ball recovery vs bad-pass interception, from `player_turnover_features`), block
+  type (rim/paint vs perimeter jump-shot contest, from `player_block_features`), rebounding
+  (offensive + defensive combined - folded together deliberately rather than splitting
+  offensive rebounding out to the offense system - contested share, and distance-from-basket
+  zone shares, from `player_rebounding_features`), and fouls (per-36 rate plus an
+  **early-foul-trouble rate**). `k` was chosen by sweeping a full k=3..15 average-silhouette
+  diagnostic rather than picking a single k by eye - the silhouette-optimal value (k=3)
+  collapsed almost entirely to a size/position proxy (bigs vs wings vs guards, sorted by
+  rebound/block volume) instead of the steal-type/block-type/foul-timing distinctions the
+  feature set was built to capture, so k=9 was chosen instead after confirming every cluster
+  at that k is basketball-legible with no merge candidates or small-n artifacts.
 
-Both are named only after reviewing the real centroid profiles and sample rosters together -
-never pre-decided from a hypothesis before seeing what the clustering actually produced.
+  The early-foul-trouble rate went through a real design iteration worth documenting: the
+  first version (`pf_q1_share` - share of a player's fouls that happened in game-clock Q1)
+  systematically penalized bench players, who can't foul in Q1 if they haven't checked in
+  yet - it was pulling low-minute reserves and genuine early-foul-prone starters into the
+  same cluster on a spurious signal (caught when Matisse Thybulle, a well-regarded point-of-
+  attack defender, landed in a "low-event bench guard" cluster). The fix: two new columns on
+  `player_foul_features` - `checkin_elapsed_seconds` (when a player first checked into the
+  game, reconstructed from `play_by_play` substitution events - 0 if they started on the
+  floor or never got subbed at all) and `onct_elapsed_at_pf_2/3/6` (the existing
+  `elapsed_seconds_at_pf_*` game-clock milestones, re-anchored to on-court playing time
+  instead of the raw clock). `early_foul_rate` is then the share of a player's *eligible*
+  games (played >= `cfg$foul_trouble_window_minutes`, default 10) where their 2nd foul came
+  within their own first `foul_trouble_window_minutes` on the floor - not the game's first N
+  minutes. After the fix, Thybulle correctly lands in a high-steal point-of-attack-defender
+  cluster with Alex Caruso, Herbert Jones, and Kris Dunn.
+  No tier layer yet.
+
+All three are named only after reviewing the real centroid profiles and sample rosters
+together - never pre-decided from a hypothesis before seeing what the clustering actually
+produced.
 
 ## What you get
 

@@ -159,3 +159,132 @@ build_player_season_alley_oop_profile <- function(cfg, logger) {
     dplyr::summarise(alley_oop_fga = dplyr::n(), alley_oop_fgm = sum(made), .groups = "drop") %>%
     dplyr::mutate(alley_oop_fg_pct = dplyr::if_else(alley_oop_fga > 0, alley_oop_fgm / alley_oop_fga, 0))
 }
+
+# ------------------------------------------------------------
+# Season-level defensive EVENT profile - steal type (lost ball =
+# on-ball/loose-ball recovery vs bad pass = interception, already
+# mined in player_turnover_features), block type (rim/paint vs
+# perimeter jump shot, already mined in player_block_features), and
+# foul rate/timing (already mined in player_foul_features). All
+# three source tables are player-game grain covering all 4 seasons -
+# no new PBP mining needed here, purely aggregation.
+# ------------------------------------------------------------
+build_player_season_defense_event_profile <- function(cfg, logger) {
+  tov <- read_parquet_or_null(cfg$path_player_turnover_features)
+  blk <- read_parquet_or_null(cfg$path_player_block_features)
+  pf  <- read_parquet_or_null(cfg$path_player_foul_features)
+  if (is.null(tov) || is.null(blk) || is.null(pf)) {
+    logger$log("Season defensive event profile: SKIPPED, missing turnover/block/foul features.")
+    return(tibble::tibble())
+  }
+
+  stl_season <- tov %>%
+    dplyr::group_by(player_id, season) %>%
+    dplyr::summarise(stl_lost_ball = sum(stl_lost_ball), stl_bad_pass = sum(stl_bad_pass), .groups = "drop") %>%
+    dplyr::mutate(
+      stl_total = stl_lost_ball + stl_bad_pass,
+      lost_ball_steal_share = dplyr::if_else(stl_total > 0, stl_lost_ball / stl_total, 0)
+    )
+
+  blk_type_cols <- c("blk_layup", "blk_dunk", "blk_hook", "blk_tip", "blk_jump_shot")
+  blk_season <- blk %>%
+    dplyr::group_by(player_id, season) %>%
+    dplyr::summarise(dplyr::across(dplyr::all_of(blk_type_cols), sum), blk_total_derived = sum(blk), .groups = "drop") %>%
+    dplyr::mutate(
+      blk_rim_total = blk_layup + blk_dunk + blk_hook + blk_tip,
+      paint_block_share = dplyr::if_else(blk_total_derived > 0, blk_rim_total / blk_total_derived, 0)
+    ) %>%
+    dplyr::select(player_id, season, paint_block_share)
+
+  # Foul-timing shape feature: early_foul_rate = share of a player's
+  # games (among games they actually played enough to be at risk of
+  # foul trouble) where their 2nd personal foul came within their own
+  # first foul_trouble_window_minutes ON THE FLOOR - NOT within the
+  # game's first N minutes on the clock. Replaces an earlier pf_q1_share
+  # (fouls-in-Q1 / total-fouls) design that penalized bench players who
+  # simply hadn't checked in yet during Q1 - see conversation history.
+  #
+  # Eligibility gate: a player-game only counts in the denominator if
+  # they played >= the window (their box-score `min` that game) - a
+  # player who logs 4 minutes can't be assessed for "foul trouble
+  # within their first 10 minutes" one way or the other, and including
+  # them would understate the rate for players who frequently get
+  # short/spot minutes for reasons unrelated to fouling.
+  window_seconds <- cfg$foul_trouble_window_minutes * 60
+  logs_min <- read_full_dataset(cfg$path_player_logs_dataset)
+  if (is.null(logs_min)) {
+    logger$log("Season defensive event profile: SKIPPED, no player_game_logs for foul-timing eligibility.")
+    return(tibble::tibble())
+  }
+  logs_min <- logs_min %>% dplyr::select(player_id, game_id_nba, season, min)
+
+  pf_timing <- pf %>%
+    dplyr::select(player_id, game_id_nba, season, onct_elapsed_at_pf_2) %>%
+    dplyr::inner_join(logs_min, by = c("player_id", "game_id_nba", "season")) %>%
+    dplyr::filter(min >= cfg$foul_trouble_window_minutes) %>%
+    dplyr::mutate(early_foul_game = !is.na(onct_elapsed_at_pf_2) & onct_elapsed_at_pf_2 <= window_seconds)
+
+  pf_season <- pf %>%
+    dplyr::group_by(player_id, season) %>%
+    dplyr::summarise(pf_total = sum(pf), .groups = "drop") %>%
+    dplyr::left_join(
+      pf_timing %>%
+        dplyr::group_by(player_id, season) %>%
+        dplyr::summarise(eligible_games = dplyr::n(), early_foul_games = sum(early_foul_game), .groups = "drop"),
+      by = c("player_id", "season")
+    ) %>%
+    dplyr::mutate(
+      eligible_games = tidyr::replace_na(eligible_games, 0),
+      early_foul_games = tidyr::replace_na(early_foul_games, 0),
+      early_foul_rate = dplyr::if_else(eligible_games > 0, early_foul_games / eligible_games, 0)
+    )
+
+  stl_season %>%
+    dplyr::select(player_id, season, stl_total, lost_ball_steal_share) %>%
+    dplyr::full_join(blk_season, by = c("player_id", "season")) %>%
+    dplyr::full_join(pf_season %>% dplyr::select(player_id, season, pf_total, early_foul_rate), by = c("player_id", "season"))
+}
+
+# ------------------------------------------------------------
+# Season-level ADVANCED rebounding profile - contested share and
+# distance-from-basket zone shares, from player_rebounding_features
+# (hoopR::nba_playerdashptreb() via R/pull_player_rebounding.R).
+#
+# IMPORTANT SCOPE LIMIT: unlike every other season-profile builder in
+# this file, this one is NOT available across all 4 seasons -
+# player_rebounding_features is scoped to cfg$player_rebounding_seasons
+# (currently "2025-26" only - no bulk API endpoint exists for this
+# tracking data, one call per player-game, so a full historical
+# backfill is a real, multi-hour decision the user hasn't made yet).
+# Whatever season(s) are actually in this table is what comes out
+# here - the caller is responsible for knowing that's currently just
+# one season, not silently assuming full historical coverage.
+# ------------------------------------------------------------
+build_player_season_advanced_rebounding_profile <- function(cfg, logger) {
+  adv <- read_parquet_or_null(cfg$path_player_rebounding_features)
+  sched <- read_full_dataset(cfg$path_schedule_dataset)
+  if (is.null(adv) || is.null(sched)) {
+    logger$log("Season advanced rebounding profile: SKIPPED, missing player_rebounding_features or schedule.")
+    return(tibble::tibble())
+  }
+
+  adv <- adv %>% dplyr::inner_join(sched %>% dplyr::select(game_id_nba, season), by = "game_id_nba")
+
+  dist_cols <- c("reb_0_3", "reb_3_6", "reb_6_10", "reb_10_plus")
+  adv %>%
+    dplyr::group_by(player_id, season) %>%
+    dplyr::summarise(
+      reb_adv_total = sum(reb, na.rm = TRUE),
+      c_reb_total   = sum(c_reb, na.rm = TRUE),
+      dplyr::across(dplyr::all_of(dist_cols), ~ sum(.x, na.rm = TRUE)),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      contested_reb_share = dplyr::if_else(reb_adv_total > 0, c_reb_total / reb_adv_total, 0),
+      reb_0_3_share    = dplyr::if_else(reb_adv_total > 0, reb_0_3 / reb_adv_total, 0),
+      reb_3_6_share    = dplyr::if_else(reb_adv_total > 0, reb_3_6 / reb_adv_total, 0),
+      reb_6_10_share   = dplyr::if_else(reb_adv_total > 0, reb_6_10 / reb_adv_total, 0),
+      reb_10_plus_share = dplyr::if_else(reb_adv_total > 0, reb_10_plus / reb_adv_total, 0)
+    ) %>%
+    dplyr::select(player_id, season, contested_reb_share, reb_0_3_share, reb_3_6_share, reb_6_10_share, reb_10_plus_share)
+}
