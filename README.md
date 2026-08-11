@@ -135,6 +135,35 @@ anything: `shooting_play == TRUE` also includes free throws, which aren't field 
 and don't reflect real shot-selection location - excluding them was what took the zone-total
 validation from 44% match to 98.33%/99.73% (FGA/FGM).
 
+### Player archetypes
+
+Two separate k-means clustering systems (both `models/`, user-run, not wired into
+`run_pipeline.bat` - retraining isn't an ETL step) classify each player-season into a text
+play-style archetype, one row per player-season (min 20 games, min 10 min/game that season):
+
+- **`player_archetypes.parquet`** (`models/build_player_archetypes.R`) - the original,
+  combined offense+defense system. K-means (k=9) on standardized box-score shape features
+  (proportions/rates, not volume - archetype describes *style*), plus a **tier** layer
+  (percentile-ranked *within* each archetype via a role-specific weighted composite -
+  what counts toward "caliber" differs by archetype: scoring/efficiency dominate for an
+  offensive-engine type, rebounding/blocks dominate for a rim-protector type). Position
+  words (guard/forward/center) are deliberately excluded from every archetype name, since
+  archetype is built from shape, not position - shape-based clustering regularly puts a
+  forward and a guard in the same bucket when their statistical profile matches.
+- **`player_offensive_archetypes.parquet`** (`models/build_offensive_archetypes.R`) -
+  offense-only (no `stl`/`blk`/`reb` at all), enriched with real shot-location data
+  (`player_shot_zone_features`) and alley-oop rate/efficiency mined directly from
+  `play_by_play` (not tracked anywhere else - the "lob threat" signal). No tier layer yet.
+  `k` is a separate config value (`player_archetype_offense_k`) from the combined system's,
+  since the two use entirely different feature sets - tested k=7 and k=8 against k=9 before
+  settling on 9: both lower values merged the two rim-based clusters (generic "inside
+  scorer" and the extreme-alley-oop-rate "lob threat" group) into one, losing the cleanest,
+  most interesting finding the richer feature set produced - confirmed empirically, not
+  assumed, that 9 was the better fit.
+
+Both are named only after reviewing the real centroid profiles and sample rosters together -
+never pre-decided from a hypothesis before seeing what the clustering actually produced.
+
 ## What you get
 
 - `data_processed/team_game_features.parquet` - one row per team per game: box score, rest/travel

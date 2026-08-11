@@ -184,6 +184,7 @@ cfg <- list(
   # archetype cluster identity stays comparable across seasons (rather
   # than each season getting its own incompatible cluster numbering).
   path_player_archetypes = "data_processed/player_archetypes.parquet",
+  path_player_offensive_archetypes = "data_processed/player_offensive_archetypes.parquet",
 
   # A player-season needs to clear both floors to get an archetype -
   # keeps small-sample garbage-time cameos from producing a noisy label.
@@ -194,8 +195,13 @@ cfg <- list(
   # printed by the script) balanced against how many distinct play
   # styles are actually nameable - not auto-selected, since the point
   # is a small set of human-legible categories, not a "statistically
-  # optimal" k.
+  # optimal" k. Separate key from player_archetype_offense_k below -
+  # the combined and offense-only systems use different feature sets
+  # entirely, so there's no reason they'd want the same k.
   player_archetype_k = 9,
+
+  # k for the offense-only system (models/build_offensive_archetypes.R).
+  player_archetype_offense_k = 9,
 
   # Fixed seed for kmeans (which is randomly initialized via nstart) -
   # without this, re-running the script mid-season would produce

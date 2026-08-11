@@ -85,3 +85,77 @@ build_player_season_profiles <- function(cfg, logger) {
       efg_pct, ft_pct
     )
 }
+
+# ------------------------------------------------------------
+# Season-level shot-SELECTION profile, built from the already-
+# validated player_shot_zone_features.parquet (player-game grain,
+# see R/features_shot_zones.R). Converted to SHARES (proportion of a
+# player's own total FGA from each zone) rather than raw counts -
+# shape, not volume, same philosophy as build_player_season_profiles()
+# above. Mid-range and corner-3 are each collapsed left+right into
+# one combined share (side-of-court handedness isn't the identity
+# question here); restricted-area and 3PT efficiency are kept as two
+# zone-specific skill markers, mirroring how efg_pct was already used
+# as a shape input even though it's technically an efficiency stat.
+# ------------------------------------------------------------
+build_player_season_shot_profile <- function(cfg, logger) {
+  zone <- read_parquet_or_null(cfg$path_player_shot_zone_features)
+  if (is.null(zone)) {
+    logger$log("Season shot-zone profile: SKIPPED, no player_shot_zone_features.parquet yet.")
+    return(tibble::tibble())
+  }
+
+  zone_cols <- c("fga_restricted_area", "fga_paint_non_ra", "fga_left_mid_range", "fga_center_mid_range",
+                 "fga_right_mid_range", "fga_left_corner_3", "fga_right_corner_3", "fga_above_the_break_3",
+                 "fgm_restricted_area", "fgm_left_corner_3", "fgm_right_corner_3", "fgm_above_the_break_3")
+
+  totals <- zone %>%
+    dplyr::group_by(player_id, season) %>%
+    dplyr::summarise(dplyr::across(dplyr::all_of(zone_cols), sum), .groups = "drop")
+
+  totals %>%
+    dplyr::mutate(
+      total_fga = fga_restricted_area + fga_paint_non_ra + fga_left_mid_range + fga_center_mid_range +
+        fga_right_mid_range + fga_left_corner_3 + fga_right_corner_3 + fga_above_the_break_3,
+      restricted_area_share   = dplyr::if_else(total_fga > 0, fga_restricted_area / total_fga, 0),
+      paint_share             = dplyr::if_else(total_fga > 0, fga_paint_non_ra / total_fga, 0),
+      mid_range_share         = dplyr::if_else(total_fga > 0, (fga_left_mid_range + fga_center_mid_range + fga_right_mid_range) / total_fga, 0),
+      corner_3_share          = dplyr::if_else(total_fga > 0, (fga_left_corner_3 + fga_right_corner_3) / total_fga, 0),
+      above_the_break_3_share = dplyr::if_else(total_fga > 0, fga_above_the_break_3 / total_fga, 0),
+      restricted_area_fg_pct  = dplyr::if_else(fga_restricted_area > 0, fgm_restricted_area / fga_restricted_area, 0),
+      three_pt_fga = fga_left_corner_3 + fga_right_corner_3 + fga_above_the_break_3,
+      three_pt_fgm = fgm_left_corner_3 + fgm_right_corner_3 + fgm_above_the_break_3,
+      three_pt_fg_pct = dplyr::if_else(three_pt_fga > 0, three_pt_fgm / three_pt_fga, 0)
+    ) %>%
+    dplyr::select(player_id, season, total_fga, restricted_area_share, paint_share, mid_range_share,
+                  corner_3_share, above_the_break_3_share, restricted_area_fg_pct, three_pt_fg_pct)
+}
+
+# ------------------------------------------------------------
+# Alley-oop rate/efficiency per player-season, mined directly from
+# play_by_play type_text - not currently broken out anywhere else
+# (they're folded into the general dunk/layup zone buckets in
+# player_shot_zone_features). athlete_1 = shooter, the same
+# convention verified for every shooting_play row.
+# ------------------------------------------------------------
+ALLEY_OOP_TYPES <- c("Alley Oop Dunk Shot", "Alley Oop Layup Shot",
+                      "Running Alley Oop Dunk Shot", "Running Alley Oop Layup Shot")
+
+build_player_season_alley_oop_profile <- function(cfg, logger) {
+  pbp <- read_full_dataset(cfg$path_playbyplay_dataset)
+  espn_map <- read_parquet_or_null(cfg$path_espn_player_id_mapping)
+  if (is.null(pbp) || is.null(espn_map)) {
+    logger$log("Season alley-oop profile: SKIPPED, missing play_by_play or espn_player_id_mapping.")
+    return(tibble::tibble())
+  }
+
+  oops <- pbp %>%
+    dplyr::filter(gsub("\n", " ", type_text) %in% ALLEY_OOP_TYPES, !is.na(athlete_id_1)) %>%
+    dplyr::transmute(athlete_id_espn = as.character(athlete_id_1), season, made = scoring_play) %>%
+    dplyr::inner_join(espn_map %>% dplyr::select(athlete_id_espn, player_id), by = "athlete_id_espn")
+
+  oops %>%
+    dplyr::group_by(player_id, season) %>%
+    dplyr::summarise(alley_oop_fga = dplyr::n(), alley_oop_fgm = sum(made), .groups = "drop") %>%
+    dplyr::mutate(alley_oop_fg_pct = dplyr::if_else(alley_oop_fga > 0, alley_oop_fgm / alley_oop_fga, 0))
+}
